@@ -29,9 +29,9 @@ export default function App() {
       <header className="header">
         <div className="header-logo" onClick={() => navigiere('start')}>
           <img
-            src="/tsv-logo.webp"
+            src="https://tsv-ug.de/wp-content/uploads/2024/03/TSV-UG_Logo_BlauGelb_ImKreis.svg"
             alt="TSV UG Logo"
-            style={{ height: 38, width: 'auto' }}
+            style={{ height: 42, width: 'auto' }}
             onError={e => { e.target.style.display = 'none' }}
           />
           <div>
