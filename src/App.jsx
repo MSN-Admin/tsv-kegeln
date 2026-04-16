@@ -16,7 +16,7 @@ const SEITEN = [
 ]
 
 export default function App() {
-  const [seite, setSeite]       = useState('start')
+  const [seite, setSeite]         = useState('start')
   const [menuOffen, setMenuOffen] = useState(false)
 
   function navigiere(key) {
@@ -28,17 +28,18 @@ export default function App() {
     <div>
       <header className="header">
         <div className="header-logo" onClick={() => navigiere('start')}>
-          <img src="/tsv-logo.webp" alt="TSV UG Logo" style={{ height: 38, width: 'auto', filter: 'brightness(0) invert(1)' }} />
-            <circle cx="19" cy="19" r="18" fill="#F5C400" stroke="white" strokeWidth="1.5"/>
-            <text x="19" y="25" textAnchor="middle" fontSize="18" fontWeight="800" fill="#003D8F" fontFamily="Arial,sans-serif">T</text>
-          </svg>
+          <img
+            src="/tsv-logo.webp"
+            alt="TSV UG Logo"
+            style={{ height: 38, width: 'auto', filter: 'brightness(0) invert(1)' }}
+            onError={e => { e.target.style.display = 'none' }}
+          />
           <div>
             <h1>TSV UG Kegeln</h1>
             <span>Unterpfaffenhofen-Germering e.V.</span>
           </div>
         </div>
 
-        {/* Desktop Nav */}
         <nav className="nav">
           {SEITEN.map(s => (
             <a key={s.key} className={seite === s.key ? 'active' : ''}
@@ -48,7 +49,6 @@ export default function App() {
           ))}
         </nav>
 
-        {/* Hamburger */}
         <button className="hamburger" onClick={() => setMenuOffen(o => !o)} aria-label="Menü">
           <span style={{ transform: menuOffen ? 'rotate(45deg) translate(5px, 5px)' : '' }} />
           <span style={{ opacity: menuOffen ? 0 : 1 }} />
@@ -56,7 +56,6 @@ export default function App() {
         </button>
       </header>
 
-      {/* Mobile Nav Overlay */}
       <nav className={`mobile-nav ${menuOffen ? 'open' : ''}`}>
         {SEITEN.map(s => (
           <a key={s.key} className={seite === s.key ? 'active' : ''}
