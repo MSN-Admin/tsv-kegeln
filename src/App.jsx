@@ -31,7 +31,7 @@ export default function App() {
           <img
             src="/tsv-logo.svg"
             alt="TSV UG Logo"
-            style={{ height: 42, width: 'auto' }}
+            style={{ height: 44, width: 44 }}
             onError={e => { e.target.style.display = 'none' }}
           />
           <div>
