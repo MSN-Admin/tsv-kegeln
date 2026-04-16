@@ -23,15 +23,17 @@ export default function Startseite({ nav }) {
         for (const e of erg) {
           const id = e.mitglied_id
           const name = e.mitglieder?.name || '–'
-          if (!map[id]) map[id] = { name, punkte: [], beste: 0 }
+          if (!map[id]) map[id] = { name, punkte: [], wettkampf: [], beste: 0 }
           map[id].punkte.push(e.gesamt_punkte)
           map[id].beste = Math.max(map[id].beste, e.gesamt_punkte)
+          if (e.art === 'wettkampf') map[id].wettkampf.push(e.gesamt_punkte)
         }
         const liste = Object.values(map).map(m => ({
           name: m.name,
           schnitt: (m.punkte.reduce((a, b) => a + b, 0) / m.punkte.length).toFixed(1),
           beste: m.beste,
           runden: m.punkte.length,
+          wettkampfGesamt: m.wettkampf.length > 0 ? m.wettkampf.reduce((a, b) => a + b, 0) : null,
         })).sort((a, b) => parseFloat(b.schnitt) - parseFloat(a.schnitt))
         setRangliste(liste)
       }
@@ -142,6 +144,12 @@ export default function Startseite({ nav }) {
                   <div className="rang-punkte">{m.schnitt}</div>
                   <div className="rang-sub">Ø Punkte</div>
                 </div>
+                {m.wettkampfGesamt !== null && (
+                  <div style={{ textAlign: 'right', marginLeft: 8, background: '#fff3cd', borderRadius: 8, padding: '4px 8px' }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#7a5800' }}>{m.wettkampfGesamt}</div>
+                    <div style={{ fontSize: 11, color: '#7a5800' }}>WK Gesamt</div>
+                  </div>
+                )}
               </div>
             ))
           )}

@@ -7,36 +7,70 @@ export default function Admin() {
   const [eingeloggt, setEingeloggt] = useState(false)
   const [pw, setPw]                 = useState('')
   const [pwFehler, setPwFehler]     = useState('')
+  const [tab, setTab]               = useState('termine')
+
+  // Mitglieder
   const [mitglieder, setMitglieder] = useState([])
-  const [name, setName]             = useState('')
-  const [pin, setPin]               = useState('')
-  const [eintritt, setEintritt]     = useState('')
-  const [meldung, setMeldung]       = useState('')
+  const [mName, setMName]           = useState('')
+  const [mPin, setMPin]             = useState('')
+  const [mEintritt, setMEintritt]   = useState('')
+  const [mMeldung, setMMeldung]     = useState('')
+
+  // Termine
+  const [termine, setTermine]             = useState([])
+  const [tTitel, setTTitel]               = useState('')
+  const [tDatum, setTDatum]               = useState('')
+  const [tUhrzeit, setTUhrzeit]           = useState('')
+  const [tOrt, setTOrt]                   = useState('')
+  const [tBeschreibung, setTBeschreibung] = useState('')
+  const [tArt, setTArt]                   = useState('sonstiges')
+  const [tMeldung, setTMeldung]           = useState('')
+
+  // Ergebnisse
+  const [ergebnisse, setErgebnisse]     = useState([])
+  const [ergFilter, setErgFilter]       = useState('')
+  const [bearbeite, setBearbeite]       = useState(null)
+  const [editWerte, setEditWerte]       = useState({})
+  const [ergMeldung, setErgMeldung]     = useState('')
 
   function login() {
-    if (pw === ADMIN_PASSWORT) { setEingeloggt(true); lade() }
+    if (pw === ADMIN_PASSWORT) { setEingeloggt(true); ladeAlles() }
     else setPwFehler('Falsches Passwort.')
   }
 
-  async function lade() {
-    const { data } = await supabase.from('mitglieder').select('*').order('name')
-    setMitglieder(data || [])
+  async function ladeAlles() {
+    const { data: m } = await supabase.from('mitglieder').select('*').order('name')
+    setMitglieder(m || [])
+    const { data: t } = await supabase.from('termine').select('*').order('datum')
+    setTermine(t || [])
+    await ladeErgebnisse()
   }
 
-  async function anlegen() {
-    setMeldung('')
+  async function ladeErgebnisse() {
+    const { data } = await supabase
+      .from('ergebnisse')
+      .select('id, datum, art, ort, runde, volle_punkte, volle_fehler, abraeumen_punkte, abraeumen_fehler, gesamt_punkte, gesamt_fehler, mitglied_id, mitglieder(name)')
+      .order('datum', { ascending: false })
+      .order('mitglied_id')
+      .order('runde')
+    setErgebnisse(data || [])
+  }
+
+  // Mitglieder
+  async function mitgliedAnlegen() {
+    setMMeldung('')
     const { error } = await supabase.from('mitglieder').insert({
-      name, pin_hash: pin, eintrittsdatum: eintritt || null
+      name: mName, pin_hash: mPin, eintrittsdatum: mEintritt || null
     })
-    if (error) { setMeldung('Fehler: ' + error.message); return }
-    setMeldung('Mitglied angelegt!')
-    setName(''); setPin(''); setEintritt('')
-    lade()
+    if (error) { setMMeldung('Fehler: ' + error.message); return }
+    setMMeldung('Mitglied angelegt!')
+    setMName(''); setMPin(''); setMEintritt('')
+    ladeAlles()
   }
 
   async function toggleAktiv(m) {
     await supabase.from('mitglieder').update({ aktiv: !m.aktiv }).eq('id', m.id)
-    lade()
+    ladeAlles()
   }
 
   async function pinAendern(m) {
@@ -46,9 +80,79 @@ export default function Admin() {
     alert('PIN geändert.')
   }
 
+  // Termine
+  async function terminAnlegen() {
+    setTMeldung('')
+    const { error } = await supabase.from('termine').insert({
+      titel: tTitel, datum: tDatum,
+      uhrzeit: tUhrzeit || null, ort: tOrt || null,
+      beschreibung: tBeschreibung || null, art: tArt,
+    })
+    if (error) { setTMeldung('Fehler: ' + error.message); return }
+    setTMeldung('Termin angelegt!')
+    setTTitel(''); setTDatum(''); setTUhrzeit(''); setTOrt(''); setTBeschreibung(''); setTArt('sonstiges')
+    ladeAlles()
+  }
+
+  async function terminLoeschen(id) {
+    if (!confirm('Termin wirklich löschen?')) return
+    await supabase.from('termine').delete().eq('id', id)
+    ladeAlles()
+  }
+
+  // Ergebnisse
+  function startBearbeiten(e) {
+    setBearbeite(e.id)
+    setEditWerte({
+      volle_punkte:     e.volle_punkte,
+      volle_fehler:     e.volle_fehler,
+      abraeumen_punkte: e.abraeumen_punkte,
+      abraeumen_fehler: e.abraeumen_fehler,
+    })
+    setErgMeldung('')
+  }
+
+  async function ergebnisSpeichern(id) {
+    setErgMeldung('')
+    const { error } = await supabase.from('ergebnisse').update({
+      volle_punkte:     parseInt(editWerte.volle_punkte),
+      volle_fehler:     parseInt(editWerte.volle_fehler) || 0,
+      abraeumen_punkte: parseInt(editWerte.abraeumen_punkte),
+      abraeumen_fehler: parseInt(editWerte.abraeumen_fehler) || 0,
+    }).eq('id', id)
+    if (error) { setErgMeldung('Fehler: ' + error.message); return }
+    setBearbeite(null)
+    setErgMeldung('✓ Gespeichert!')
+    await ladeErgebnisse()
+    setTimeout(() => setErgMeldung(''), 3000)
+  }
+
+  async function ergebnisLoeschen(id) {
+    if (!confirm('Dieses Ergebnis wirklich löschen?')) return
+    await supabase.from('ergebnisse').delete().eq('id', id)
+    await ladeErgebnisse()
+  }
+
+  // Gefilterte Ergebnisse
+  const gefilterteErg = ergFilter
+    ? ergebnisse.filter(e => e.mitglieder?.name?.toLowerCase().includes(ergFilter.toLowerCase()))
+    : ergebnisse
+
   function formatDatum(d) {
     if (!d) return '–'
     return new Date(d).toLocaleDateString('de-DE')
+  }
+
+  function formatUhrzeit(t) {
+    if (!t) return '–'
+    return t.slice(0, 5) + ' Uhr'
+  }
+
+  // Eingabe-Stil
+  const editInput = {
+    width: '100%', padding: '6px 8px', fontSize: 15,
+    border: '2px solid #003D8F', borderRadius: 6,
+    textAlign: 'right', fontWeight: 700,
   }
 
   if (!eingeloggt) return (
@@ -60,81 +164,303 @@ export default function Admin() {
           onChange={e => setPw(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && login()} />
       </div>
-      {pwFehler && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 12 }}>{pwFehler}</p>}
-      <button className="btn btn-primary" onClick={login} style={{ width: '100%', justifyContent: 'center' }}>
-        Anmelden
-      </button>
+      {pwFehler && <p style={{ color: '#c0392b', fontSize: 14, marginBottom: 12 }}>{pwFehler}</p>}
+      <button className="btn btn-primary btn-voll" onClick={login}>Anmelden</button>
     </div>
   )
 
   return (
     <div>
-      <div className="card" style={{ maxWidth: 480 }}>
-        <div className="card-title">Mitglied anlegen</div>
-        <div className="form-group">
-          <label>Name</label>
-          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Vorname Nachname" />
-        </div>
-        <div className="form-group">
-          <label>PIN (4–6 Stellen)</label>
-          <input type="text" maxLength={6} value={pin} onChange={e => setPin(e.target.value)} placeholder="z.B. 1234" />
-        </div>
-        <div className="form-group">
-          <label>Eintrittsdatum (optional)</label>
-          <input type="date" value={eintritt} onChange={e => setEintritt(e.target.value)} />
-        </div>
-        {meldung && (
-          <p style={{ color: meldung.startsWith('Fehler') ? '#c0392b' : 'green', fontSize: 13, marginBottom: 12 }}>
-            {meldung}
-          </p>
-        )}
-        <button className="btn btn-gelb" onClick={anlegen} disabled={!name || !pin}
-          style={{ width: '100%', justifyContent: 'center' }}>
-          Mitglied anlegen
-        </button>
+      {/* Tab Navigation */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 20 }}>
+        {[
+          { key: 'termine',     label: '📅 Termine' },
+          { key: 'ergebnisse',  label: '🎳 Ergebnisse' },
+          { key: 'mitglieder',  label: '👥 Mitglieder' },
+        ].map(t => (
+          <button key={t.key}
+            className={tab === t.key ? 'btn btn-primary' : 'btn btn-outline'}
+            style={{ fontSize: 14, padding: '10px 8px' }}
+            onClick={() => setTab(t.key)}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <div className="card">
-        <div className="card-title">Alle Mitglieder ({mitglieder.length})</div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Eintritt</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {mitglieder.map((m, mi) => (
-                <tr key={mi}>
-                  <td style={{ fontWeight: 600 }}>{m.name}</td>
-                  <td>
-                    <span className="badge" style={{
-                      background: m.aktiv ? '#d4edda' : '#f8d7da',
-                      color: m.aktiv ? '#155724' : '#721c24'
-                    }}>
-                      {m.aktiv ? 'aktiv' : 'inaktiv'}
-                    </span>
-                  </td>
-                  <td style={{ fontSize: 13 }}>{formatDatum(m.eintrittsdatum)}</td>
-                  <td style={{ textAlign: 'right', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                    <button onClick={() => pinAendern(m)}
-                      style={{ background: 'none', border: 'none', color: 'var(--tsv-blau)', cursor: 'pointer', fontSize: 13 }}>
-                      PIN ändern
-                    </button>
-                    <button onClick={() => toggleAktiv(m)}
-                      style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 13 }}>
-                      {m.aktiv ? 'deaktivieren' : 'aktivieren'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* ── TERMINE ── */}
+      {tab === 'termine' && (
+        <div>
+          <div className="card">
+            <div className="card-title">Termin anlegen</div>
+            <div className="form-group">
+              <label>Titel</label>
+              <input type="text" value={tTitel} onChange={e => setTTitel(e.target.value)} placeholder="z.B. Vereinstraining" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-group">
+                <label>Datum</label>
+                <input type="date" value={tDatum} onChange={e => setTDatum(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Uhrzeit (optional)</label>
+                <input type="time" value={tUhrzeit} onChange={e => setTUhrzeit(e.target.value)} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-group">
+                <label>Art</label>
+                <select value={tArt} onChange={e => setTArt(e.target.value)}>
+                  <option value="training">Training</option>
+                  <option value="wettkampf">Wettkampf</option>
+                  <option value="sonstiges">Sonstiges</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Ort (optional)</label>
+                <input type="text" value={tOrt} onChange={e => setTOrt(e.target.value)} placeholder="z.B. Kegelheim" />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Beschreibung (optional)</label>
+              <input type="text" value={tBeschreibung} onChange={e => setTBeschreibung(e.target.value)} />
+            </div>
+            {tMeldung && <p style={{ color: tMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)', fontSize: 14, marginBottom: 12 }}>{tMeldung}</p>}
+            <button className="btn btn-gelb btn-voll" onClick={terminAnlegen} disabled={!tTitel || !tDatum}>
+              Termin anlegen
+            </button>
+          </div>
+
+          <div className="card">
+            <div className="card-title">Alle Termine ({termine.length})</div>
+            {termine.length === 0 ? <div className="empty">Noch keine Termine.</div> : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Datum</th>
+                      <th>Zeit</th>
+                      <th>Titel</th>
+                      <th>Art</th>
+                      <th>Ort</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {termine.map((t, i) => (
+                      <tr key={i}>
+                        <td>{formatDatum(t.datum)}</td>
+                        <td>{formatUhrzeit(t.uhrzeit)}</td>
+                        <td style={{ fontWeight: 600 }}>{t.titel}</td>
+                        <td><span className={`badge badge-${t.art}`}>{t.art}</span></td>
+                        <td style={{ color: 'var(--grau-text)' }}>{t.ort || '–'}</td>
+                        <td>
+                          <button onClick={() => terminLoeschen(t.id)}
+                            style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 14 }}>
+                            löschen
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ── ERGEBNISSE ── */}
+      {tab === 'ergebnisse' && (
+        <div>
+          <div className="card">
+            <div className="card-title">🎳 Ergebnisse bearbeiten</div>
+
+            {ergMeldung && (
+              <div style={{
+                background: ergMeldung.startsWith('Fehler') ? '#fde8e8' : '#d4edda',
+                border: `2px solid ${ergMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)'}`,
+                borderRadius: 8, padding: '10px 14px', marginBottom: 16,
+                fontWeight: 700, fontSize: 15,
+                color: ergMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)'
+              }}>
+                {ergMeldung}
+              </div>
+            )}
+
+            {/* Filter */}
+            <div className="form-group">
+              <label>Nach Mitglied filtern</label>
+              <input type="text" value={ergFilter}
+                onChange={e => setErgFilter(e.target.value)}
+                placeholder="Name eingeben…" />
+            </div>
+
+            <p style={{ fontSize: 14, color: 'var(--grau-text)', marginBottom: 12 }}>
+              {gefilterteErg.length} Ergebnis{gefilterteErg.length !== 1 ? 'se' : ''}
+            </p>
+
+            {gefilterteErg.length === 0 ? (
+              <div className="empty">Keine Ergebnisse gefunden.</div>
+            ) : (
+              gefilterteErg.map((e, i) => (
+                <div key={i} style={{
+                  border: `2px solid ${bearbeite === e.id ? '#003D8F' : 'var(--grau-mid)'}`,
+                  borderRadius: 10, padding: 14, marginBottom: 10,
+                  background: bearbeite === e.id ? '#f0f4ff' : 'var(--grau-hell)',
+                }}>
+                  {/* Kopfzeile */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: 16 }}>{e.mitglieder?.name}</span>
+                      <span style={{ marginLeft: 8, fontSize: 14, color: 'var(--grau-text)' }}>
+                        {formatDatum(e.datum)} · Runde {e.runde}
+                      </span>
+                      <div style={{ marginTop: 4, display: 'flex', gap: 8 }}>
+                        <span className={`badge badge-${e.art}`}>{e.art}</span>
+                        <span style={{ fontSize: 13 }}>{e.ort === 'heim' ? '🏠 Heim' : '✈️ Auswärts'}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {bearbeite !== e.id && (
+                        <button onClick={() => startBearbeiten(e)}
+                          style={{ background: 'none', border: '2px solid #003D8F', color: '#003D8F', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                          ✏️ Ändern
+                        </button>
+                      )}
+                      <button onClick={() => ergebnisLoeschen(e.id)}
+                        style={{ background: 'none', border: '2px solid #c0392b', color: '#c0392b', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                        🗑️ Löschen
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Anzeige oder Bearbeitung */}
+                  {bearbeite === e.id ? (
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 4 }}>VOLLE PKT</div>
+                          <input type="number" style={editInput} value={editWerte.volle_punkte}
+                            onChange={e => setEditWerte(p => ({ ...p, volle_punkte: e.target.value }))} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 4 }}>VOLLE FEHL</div>
+                          <input type="number" style={editInput} value={editWerte.volle_fehler}
+                            onChange={e => setEditWerte(p => ({ ...p, volle_fehler: e.target.value }))} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 4 }}>ABR. PKT</div>
+                          <input type="number" style={editInput} value={editWerte.abraeumen_punkte}
+                            onChange={e => setEditWerte(p => ({ ...p, abraeumen_punkte: e.target.value }))} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 4 }}>ABR. FEHL</div>
+                          <input type="number" style={editInput} value={editWerte.abraeumen_fehler}
+                            onChange={e => setEditWerte(p => ({ ...p, abraeumen_fehler: e.target.value }))} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-gruen" style={{ flex: 1 }} onClick={() => ergebnisSpeichern(e.id)}>
+                          ✓ Speichern
+                        </button>
+                        <button className="btn btn-outline" onClick={() => setBearbeite(null)}>
+                          Abbrechen
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                      <div style={{ textAlign: 'center', background: '#fff', borderRadius: 6, padding: '6px 4px' }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: '#003D8F' }}>{e.volle_punkte}</div>
+                        <div style={{ fontSize: 11, color: 'var(--grau-text)' }}>Volle</div>
+                      </div>
+                      <div style={{ textAlign: 'center', background: '#fff', borderRadius: 6, padding: '6px 4px' }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: '#003D8F' }}>{e.abraeumen_punkte}</div>
+                        <div style={{ fontSize: 11, color: 'var(--grau-text)' }}>Abräumen</div>
+                      </div>
+                      <div style={{ textAlign: 'center', background: '#003D8F', borderRadius: 6, padding: '6px 4px' }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>{e.gesamt_punkte}</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Gesamt</div>
+                      </div>
+                      <div style={{ textAlign: 'center', background: e.gesamt_fehler > 0 ? '#fde8e8' : '#fff', borderRadius: 6, padding: '6px 4px' }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: e.gesamt_fehler > 0 ? '#c0392b' : '#003D8F' }}>{e.gesamt_fehler}</div>
+                        <div style={{ fontSize: 11, color: 'var(--grau-text)' }}>Fehler</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MITGLIEDER ── */}
+      {tab === 'mitglieder' && (
+        <div>
+          <div className="card">
+            <div className="card-title">Mitglied anlegen</div>
+            <div className="form-group">
+              <label>Name</label>
+              <input type="text" value={mName} onChange={e => setMName(e.target.value)} placeholder="Vorname Nachname" />
+            </div>
+            <div className="form-group">
+              <label>PIN (4–6 Stellen)</label>
+              <input type="text" maxLength={6} value={mPin} onChange={e => setMPin(e.target.value)} placeholder="z.B. 1234" />
+            </div>
+            <div className="form-group">
+              <label>Eintrittsdatum (optional)</label>
+              <input type="date" value={mEintritt} onChange={e => setMEintritt(e.target.value)} />
+            </div>
+            {mMeldung && <p style={{ color: mMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)', fontSize: 14, marginBottom: 12 }}>{mMeldung}</p>}
+            <button className="btn btn-gelb btn-voll" onClick={mitgliedAnlegen} disabled={!mName || !mPin}>
+              Mitglied anlegen
+            </button>
+          </div>
+
+          <div className="card">
+            <div className="card-title">Alle Mitglieder ({mitglieder.length})</div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Eintritt</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mitglieder.map((m, i) => (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 600 }}>{m.name}</td>
+                      <td>
+                        <span className="badge" style={{
+                          background: m.aktiv ? '#d4edda' : '#f8d7da',
+                          color: m.aktiv ? '#155724' : '#721c24'
+                        }}>
+                          {m.aktiv ? 'aktiv' : 'inaktiv'}
+                        </span>
+                      </td>
+                      <td>{formatDatum(m.eintrittsdatum)}</td>
+                      <td style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                        <button onClick={() => pinAendern(m)}
+                          style={{ background: 'none', border: 'none', color: '#003D8F', cursor: 'pointer', fontSize: 13 }}>
+                          PIN ändern
+                        </button>
+                        <button onClick={() => toggleAktiv(m)}
+                          style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 13 }}>
+                          {m.aktiv ? 'deaktivieren' : 'aktivieren'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

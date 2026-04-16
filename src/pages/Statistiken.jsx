@@ -150,6 +150,14 @@ export default function Statistiken() {
                   <div className="stat-value">{schnitt(abraeumen)}</div>
                   <div className="stat-label">Ø Abräumen</div>
                 </div>
+                {wettkampf.length > 0 && (
+                  <div className="stat-card" style={{ gridColumn: '1 / -1', borderTopColor: '#F5C400', background: '#fff9e6' }}>
+                    <div className="stat-value" style={{ color: '#7a5800', fontSize: 36 }}>
+                      {wettkampf.reduce((a, b) => a + b, 0)}
+                    </div>
+                    <div className="stat-label" style={{ color: '#7a5800' }}>🏆 Wettkampf Gesamt ({wettkampf.length} Runden)</div>
+                  </div>
+                )}
               </div>
 
               {/* Training vs Wettkampf */}
