@@ -28,7 +28,7 @@ export default function App() {
     <div>
       <header className="header">
         <div className="header-logo" onClick={() => navigiere('start')}>
-          <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <img src="/tsv-logo.webp" alt="TSV UG Logo" style={{ height: 38, width: 'auto', filter: 'brightness(0) invert(1)' }} />
             <circle cx="19" cy="19" r="18" fill="#F5C400" stroke="white" strokeWidth="1.5"/>
             <text x="19" y="25" textAnchor="middle" fontSize="18" fontWeight="800" fill="#003D8F" fontFamily="Arial,sans-serif">T</text>
           </svg>
