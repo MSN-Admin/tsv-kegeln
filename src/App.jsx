@@ -28,11 +28,14 @@ export default function App() {
     <div>
       <header className="header">
         <div className="header-logo" onClick={() => navigiere('start')}>
-          <img
-            src="/tsv-logo.svg"
-            alt="TSV UG Logo"
-            style={{ height: 48, width: 48, display: 'block', mixBlendMode: 'multiply' }}
-          />
+          <div style={{
+            width: 44, height: 44, borderRadius: '50%',
+            background: 'white', overflow: 'hidden',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <img src="/tsv-logo.svg" alt="TSV UG Logo" style={{ width: 40, height: 40 }} />
+          </div>
           <div>
             <h1>TSV UG Kegeln</h1>
             <span>Unterpfaffenhofen-Germering e.V.</span>
