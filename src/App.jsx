@@ -31,7 +31,7 @@ export default function App() {
           <img
             src="/tsv-logo.svg"
             alt="TSV UG Logo"
-            style={{ height: 48, width: 48, display: 'block' }}
+            style={{ height: 48, width: 48, display: 'block', mixBlendMode: 'multiply' }}
           />
           <div>
             <h1>TSV UG Kegeln</h1>
