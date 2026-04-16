@@ -31,7 +31,7 @@ export default function App() {
           <img
             src="/tsv-logo.webp"
             alt="TSV UG Logo"
-            style={{ height: 38, width: 'auto', filter: 'brightness(0) invert(1)' }}
+            style={{ height: 38, width: 'auto' }}
             onError={e => { e.target.style.display = 'none' }}
           />
           <div>
