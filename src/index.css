@@ -486,8 +486,11 @@ td.rang { font-weight: 700; color: var(--blau); text-align: center; font-size: 1
   .hero-kegel { display: none; }
   .start-grid { grid-template-columns: 1fr !important; }
   .vergleich-grid { grid-template-columns: 1fr !important; }
+  .header-logo span { display: none; }
 }
 
 @media (min-width: 701px) {
   html { font-size: 16px; }
+  .hamburger { display: none !important; }
+  .mobile-nav { display: none !important; }
 }
