@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 
-const ADMIN_PASSWORT = 'tsv-kegeln-2025'
+const ADMIN_PASSWORT = 'Markus'
 
 export default function Admin() {
   const [eingeloggt, setEingeloggt] = useState(false)
