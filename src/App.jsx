@@ -6,11 +6,13 @@ import Eintragen   from './pages/Eintragen'
 import Statistiken from './pages/Statistiken'
 import Termine     from './pages/Termine'
 import Auswaerts   from './pages/Auswaerts'
+import Liga        from './pages/Liga'
 import Admin       from './pages/Admin'
 
 const SEITEN = [
   { key: 'start',       label: 'Start' },
   { key: 'termine',     label: 'Termine' },
+  { key: 'liga',        label: '🏆 Liga' },
   { key: 'statistiken', label: 'Statistiken' },
   { key: 'auswaerts',   label: '✈️ Auswärts' },
   { key: 'eintragen',   label: '+ Ergebnis' },
@@ -65,6 +67,7 @@ export default function App() {
       <main className="main">
         {seite === 'start'       && <Startseite   nav={navigiere} />}
         {seite === 'termine'     && <Termine                      />}
+        {seite === 'liga'        && <Liga                         />}
         {seite === 'statistiken' && <Statistiken                  />}
         {seite === 'auswaerts'   && <Auswaerts                    />}
         {seite === 'eintragen'   && <Eintragen    nav={navigiere} />}
