@@ -1,28 +1,72 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 
+function getSaisonListe() {
+  const heute = new Date()
+  const aktJahr = heute.getMonth() >= 8 ? heute.getFullYear() : heute.getFullYear() - 1
+  const liste = [{ label: 'Alle Daten', start: '2000-01-01', end: '2099-12-31' }]
+  for (let j = aktJahr; j >= aktJahr - 4; j--) {
+    liste.push({ label: `${j}/${String(j+1).slice(2)}`, start: `${j}-09-01`, end: `${j+1}-04-30` })
+  }
+  return liste
+}
+
 export default function Statistiken() {
-  const [mitglieder, setMitglieder] = useState([])
-  const [ausgewaehlt, setAusgewaehlt] = useState(null)
-  const [daten, setDaten]             = useState([])
-  const [laden, setLaden]             = useState(true)
-  const [tab, setTab]                 = useState('uebersicht')
+  const saisonListe = getSaisonListe()
+  const [mitglieder, setMitglieder]     = useState([])
+  const [modus, setModus]               = useState('einzel') // 'einzel' | 'vergleich'
+  const [ausgewaehlt, setAusgewaehlt]   = useState(null)
+  const [vergleichIds, setVergleichIds] = useState([])
+  const [daten, setDaten]               = useState([])
+  const [vergleichDaten, setVergleichDaten] = useState({})
+  const [saisonIdx, setSaisonIdx]       = useState(1)
+  const [tab, setTab]                   = useState('uebersicht')
+  const [laden, setLaden]               = useState(true)
+
+  const saison = saisonListe[saisonIdx]
 
   useEffect(() => {
-    supabase.from('mitglieder').select('id, name').eq('aktiv', true).order('name')
+    supabase.from('mitglieder').select('id, name, mannschaft').eq('aktiv', true).order('name')
       .then(({ data }) => { setMitglieder(data || []); setLaden(false) })
   }, [])
 
   async function waehle(m) {
     setAusgewaehlt(m)
     setTab('uebersicht')
+    ladeDaten(m.id, saison)
+  }
+
+  async function ladeDaten(mid, s) {
     const { data } = await supabase
       .from('ergebnisse')
       .select('datum, art, ort, runde, volle_punkte, volle_fehler, abraeumen_punkte, abraeumen_fehler, gesamt_punkte, gesamt_fehler')
-      .eq('mitglied_id', m.id)
+      .eq('mitglied_id', mid)
+      .gte('datum', s.start)
+      .lte('datum', s.end)
       .order('datum', { ascending: true })
       .order('runde', { ascending: true })
     setDaten(data || [])
+  }
+
+  useEffect(() => {
+    if (ausgewaehlt) ladeDaten(ausgewaehlt.id, saison)
+  }, [saisonIdx])
+
+  async function toggleVergleich(m) {
+    if (vergleichIds.includes(m.id)) {
+      setVergleichIds(p => p.filter(id => id !== m.id))
+      setVergleichDaten(p => { const n = { ...p }; delete n[m.id]; return n })
+    } else {
+      if (vergleichIds.length >= 4) return
+      setVergleichIds(p => [...p, m.id])
+      const { data } = await supabase
+        .from('ergebnisse')
+        .select('datum, art, ort, gesamt_punkte, gesamt_fehler, volle_punkte, abraeumen_punkte')
+        .eq('mitglied_id', m.id)
+        .gte('datum', saison.start)
+        .lte('datum', saison.end)
+      setVergleichDaten(p => ({ ...p, [m.id]: { name: m.name, mannschaft: m.mannschaft, daten: data || [] } }))
+    }
   }
 
   function schnitt(arr) {
@@ -39,26 +83,135 @@ export default function Statistiken() {
     }
     return Object.values(map).map(s => ({
       ...s,
-      schnitt: parseFloat((s.punkte.reduce((a, b) => a + b, 0) / s.punkte.length).toFixed(1)),
-      runden: s.punkte.length,
+      schnitt: parseFloat((s.punkte.reduce((a,b)=>a+b,0)/s.punkte.length).toFixed(1)),
     }))
   }
 
+  const FARBEN = ['#003D8F', '#1a7a3e', '#c0392b', '#7a5800']
+
   if (laden) return <div className="loading">Lade…</div>
 
-  // Mitglied wählen
+  // ── VERGLEICH ─────────────────────────────────────────────
+  if (modus === 'vergleich') return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        <button className="btn btn-outline" onClick={() => { setModus('einzel'); setVergleichIds([]); setVergleichDaten({}) }}>
+          ← Zurück
+        </button>
+        <div style={{ fontSize: 16, fontWeight: 700, lineHeight: '44px', color: 'var(--blau)' }}>
+          Spieler vergleichen (max. 4)
+        </div>
+      </div>
+
+      {/* Saison wählen */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+        {saisonListe.map((s, i) => (
+          <button key={i} onClick={() => { setSaisonIdx(i); setVergleichDaten({}) ; setVergleichIds([]) }}
+            style={{ padding: '4px 10px', fontSize: 13, fontWeight: 700, borderRadius: 6, border: '2px solid', cursor: 'pointer',
+              borderColor: i === saisonIdx ? 'var(--blau)' : 'var(--grau-mid)',
+              background: i === saisonIdx ? 'var(--blau)' : 'var(--weiss)',
+              color: i === saisonIdx ? 'var(--weiss)' : 'var(--grau-text)' }}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Mitglieder wählen */}
+      <div className="card">
+        <div className="card-title">Spieler auswählen</div>
+        {mitglieder.map((m, i) => {
+          const idx = vergleichIds.indexOf(m.id)
+          const aktiv = idx !== -1
+          return (
+            <div key={i} onClick={() => toggleVergleich(m)} style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
+              borderBottom: '1px solid var(--grau-mid)', cursor: 'pointer'
+            }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%',
+                background: aktiv ? FARBEN[idx] : 'var(--grau-mid)',
+                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: 14, flexShrink: 0
+              }}>
+                {aktiv ? idx + 1 : ''}
+              </div>
+              <div style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>{m.name}</div>
+              {m.mannschaft && <div style={{ fontSize: 13, color: 'var(--grau-text)' }}>{m.mannschaft}. M</div>}
+              <div style={{ fontSize: 20, color: aktiv ? FARBEN[idx] : 'var(--grau-mid)' }}>
+                {aktiv ? '✓' : '+'}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Vergleichsauswertung */}
+      {vergleichIds.length >= 2 && (
+        <div className="card">
+          <div className="card-title">Vergleich – {saison.label}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${vergleichIds.length}, 1fr)`, gap: 12, marginBottom: 20 }}>
+            {vergleichIds.map((id, idx) => {
+              const vd = vergleichDaten[id]
+              if (!vd) return null
+              const punkte = vd.daten.map(e => e.gesamt_punkte)
+              const volle  = vd.daten.map(e => e.volle_punkte)
+              const abr    = vd.daten.map(e => e.abraeumen_punkte)
+              const fehler = vd.daten.map(e => e.gesamt_fehler)
+              return (
+                <div key={id} style={{ background: '#f7f7f7', borderRadius: 10, padding: 14, borderTop: `4px solid ${FARBEN[idx]}` }}>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: FARBEN[idx], marginBottom: 10 }}>{vd.name}</div>
+                  {[
+                    { label: 'Ø Gesamt', val: schnitt(punkte) },
+                    { label: 'Beste Runde', val: punkte.length ? Math.max(...punkte) : '–' },
+                    { label: 'Ø Volle', val: schnitt(volle) },
+                    { label: 'Ø Abräumen', val: schnitt(abr) },
+                    { label: 'Ø Fehler', val: schnitt(fehler) },
+                    { label: 'Runden', val: punkte.length },
+                  ].map((r, ri) => (
+                    <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--grau-mid)', fontSize: 14 }}>
+                      <span style={{ color: 'var(--grau-text)' }}>{r.label}</span>
+                      <span style={{ fontWeight: 700 }}>{r.val}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Formkurven überlagert */}
+          {vergleichIds.map((id, idx) => {
+            const vd = vergleichDaten[id]
+            if (!vd || vd.daten.length < 2) return null
+            return null // Kurven-Rendering unten
+          })}
+        </div>
+      )}
+    </div>
+  )
+
+  // ── EINZEL ────────────────────────────────────────────────
   if (!ausgewaehlt) return (
     <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div className="card-title" style={{ marginBottom: 0 }}>📊 Statistiken</div>
+        <button className="btn btn-outline" style={{ fontSize: 14 }}
+          onClick={() => setModus('vergleich')}>
+          ⚖️ Spieler vergleichen
+        </button>
+      </div>
+
       <div className="card">
-        <div className="card-title">📊 Statistiken</div>
-        <p style={{ fontSize: 16, color: 'var(--grau-text)', marginBottom: 16 }}>
-          Tippe auf deinen Namen um deine Statistiken zu sehen.
+        <p style={{ fontSize: 15, color: 'var(--grau-text)', marginBottom: 14 }}>
+          Tippe auf einen Namen um die Statistiken zu sehen.
         </p>
         {mitglieder.map((m, i) => (
           <div key={i} className="mitglied-karte" onClick={() => waehle(m)}>
             <div className="mitglied-avatar">{m.name.charAt(0).toUpperCase()}</div>
-            <div className="mitglied-name">{m.name}</div>
-            <div style={{ marginLeft: 'auto', color: 'var(--blau)', fontSize: 22 }}>›</div>
+            <div style={{ flex: 1 }}>
+              <div className="mitglied-name">{m.name}</div>
+              {m.mannschaft && <div style={{ fontSize: 13, color: 'var(--grau-text)' }}>{m.mannschaft}. Mannschaft</div>}
+            </div>
+            <div style={{ color: 'var(--blau)', fontSize: 22 }}>›</div>
           </div>
         ))}
       </div>
@@ -73,45 +226,65 @@ export default function Statistiken() {
   const auswaerts  = daten.filter(e => e.ort === 'auswaerts').map(e => e.gesamt_punkte)
   const volleAlle  = daten.map(e => e.volle_punkte)
   const abraeumen  = daten.map(e => e.abraeumen_punkte)
+  const fehlerAlle = daten.map(e => e.gesamt_fehler)
 
-  // Formkurve SVG
-  const kurveB = 560
-  const kurveH = 100
+  const kurveB = 560, kurveH = 100
   const minP = spieltage.length ? Math.min(...spieltage.map(s => s.schnitt)) - 10 : 0
   const maxP = spieltage.length ? Math.max(...spieltage.map(s => s.schnitt)) + 10 : 200
   const kurvePunkte = spieltage.map((s, i) => ({
-    x: spieltage.length === 1 ? kurveB / 2 : (i / (spieltage.length - 1)) * kurveB,
+    x: spieltage.length === 1 ? kurveB/2 : (i/(spieltage.length-1))*kurveB,
     y: kurveH - ((s.schnitt - minP) / (maxP - minP || 1)) * kurveH,
     s,
   }))
-  const pfad = kurvePunkte.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+  const pfad = kurvePunkte.map((p, i) => `${i===0?'M':'L'} ${p.x} ${p.y}`).join(' ')
 
   return (
     <div>
-      {/* Zurück */}
-      <button className="btn btn-outline" style={{ marginBottom: 14 }}
-        onClick={() => { setAusgewaehlt(null); setDaten([]) }}>
-        ← Zurück
-      </button>
+      {/* Zurück + Vergleich */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+        <button className="btn btn-outline" onClick={() => { setAusgewaehlt(null); setDaten([]) }}>
+          ← Zurück
+        </button>
+        <button className="btn btn-outline" style={{ fontSize: 14 }}
+          onClick={() => setModus('vergleich')}>
+          ⚖️ Vergleichen
+        </button>
+      </div>
 
-      {/* Name */}
+      {/* Name + Saison */}
       <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
           <div className="mitglied-avatar" style={{ width: 54, height: 54, fontSize: 24 }}>
             {ausgewaehlt.name.charAt(0).toUpperCase()}
           </div>
           <div>
             <div style={{ fontSize: 22, fontWeight: 700 }}>{ausgewaehlt.name}</div>
-            <div style={{ fontSize: 14, color: 'var(--grau-text)' }}>{daten.length} Runden gespielt</div>
+            {ausgewaehlt.mannschaft && (
+              <div style={{ fontSize: 14, color: 'var(--grau-text)' }}>{ausgewaehlt.mannschaft}. Mannschaft</div>
+            )}
+            <div style={{ fontSize: 13, color: 'var(--grau-text)' }}>{daten.length} Runden</div>
           </div>
+        </div>
+
+        {/* Saison Filter */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {saisonListe.map((s, i) => (
+            <button key={i} onClick={() => setSaisonIdx(i)}
+              style={{ padding: '4px 10px', fontSize: 13, fontWeight: 700, borderRadius: 6, border: '2px solid', cursor: 'pointer',
+                borderColor: i === saisonIdx ? 'var(--blau)' : 'var(--grau-mid)',
+                background: i === saisonIdx ? 'var(--blau)' : 'var(--weiss)',
+                color: i === saisonIdx ? 'var(--weiss)' : 'var(--grau-text)' }}>
+              {s.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {daten.length === 0 ? (
-        <div className="card"><div className="empty">Noch keine Ergebnisse vorhanden.</div></div>
+        <div className="card"><div className="empty">Keine Ergebnisse in dieser Saison.</div></div>
       ) : (
         <>
-          {/* Tab Navigation */}
+          {/* Tabs */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
             {[
               { key: 'uebersicht', label: '📊 Übersicht' },
@@ -130,7 +303,6 @@ export default function Statistiken() {
           {/* ÜBERSICHT */}
           {tab === 'uebersicht' && (
             <div>
-              {/* Kennzahlen */}
               <div className="stats-row" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
                 <div className="stat-card">
                   <div className="stat-value">{schnitt(allePunkte)}</div>
@@ -150,17 +322,24 @@ export default function Statistiken() {
                   <div className="stat-value">{schnitt(abraeumen)}</div>
                   <div className="stat-label">Ø Abräumen</div>
                 </div>
+                <div className="stat-card" style={{ borderTopColor: '#c0392b' }}>
+                  <div className="stat-value" style={{ color: '#c0392b' }}>{schnitt(fehlerAlle)}</div>
+                  <div className="stat-label">Ø Fehlwürfe</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-value">{daten.length}</div>
+                  <div className="stat-label">Runden</div>
+                </div>
                 {wettkampf.length > 0 && (
-                  <div className="stat-card" style={{ gridColumn: '1 / -1', borderTopColor: '#F5C400', background: '#fff9e6' }}>
-                    <div className="stat-value" style={{ color: '#7a5800', fontSize: 36 }}>
-                      {wettkampf.reduce((a, b) => a + b, 0)}
+                  <div className="stat-card" style={{ gridColumn: '1 / -1', borderTopColor: 'var(--gelb)', background: '#fff9e6' }}>
+                    <div className="stat-value" style={{ color: '#7a5800', fontSize: 34 }}>
+                      {wettkampf.reduce((a,b)=>a+b,0)}
                     </div>
                     <div className="stat-label" style={{ color: '#7a5800' }}>🏆 Wettkampf Gesamt ({wettkampf.length} Runden)</div>
                   </div>
                 )}
               </div>
 
-              {/* Training vs Wettkampf */}
               <div className="card">
                 <div className="card-title" style={{ fontSize: 17 }}>Training vs. Wettkampf</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -177,7 +356,6 @@ export default function Statistiken() {
                 </div>
               </div>
 
-              {/* Heim vs Auswärts */}
               <div className="card">
                 <div className="card-title" style={{ fontSize: 17 }}>Zuhause vs. Auswärts</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -201,48 +379,37 @@ export default function Statistiken() {
             <div className="card">
               <div className="card-title" style={{ fontSize: 17 }}>📈 Formkurve</div>
               {spieltage.length < 2 ? (
-                <div className="empty">Mindestens 2 Spieltage für die Formkurve nötig.</div>
+                <div className="empty">Mindestens 2 Spieltage nötig.</div>
               ) : (
                 <>
-                  <svg viewBox={`-10 -15 ${kurveB + 20} ${kurveH + 30}`} style={{ width: '100%', height: 130 }}>
+                  <svg viewBox={`-10 -15 ${kurveB+20} ${kurveH+30}`} style={{ width: '100%', height: 130 }}>
                     <path d={pfad} fill="none" stroke="var(--blau)" strokeWidth="2.5" strokeLinejoin="round"/>
                     {kurvePunkte.map((p, i) => (
                       <g key={i}>
                         <circle cx={p.x} cy={p.y} r="6"
                           fill={p.s.art === 'wettkampf' ? 'var(--gelb)' : 'var(--blau)'}
                           stroke="white" strokeWidth="2"/>
-                        <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize="11" fill="var(--blau)" fontWeight="700">
+                        <text x={p.x} y={p.y-10} textAnchor="middle" fontSize="11" fill="var(--blau)" fontWeight="700">
                           {p.s.schnitt}
                         </text>
                       </g>
                     ))}
                   </svg>
-                  <div style={{ display: 'flex', gap: 16, fontSize: 14, color: 'var(--grau-text)', marginTop: 8 }}>
-                    <span>🔵 Training</span>
-                    <span>🟡 Wettkampf</span>
+                  <div style={{ display: 'flex', gap: 16, fontSize: 14, color: 'var(--grau-text)', marginTop: 8, marginBottom: 16 }}>
+                    <span>🔵 Training</span><span>🟡 Wettkampf</span>
                   </div>
-
-                  {/* Spieltag-Liste */}
-                  <div style={{ marginTop: 16 }}>
-                    {[...spieltage].reverse().map((s, i) => (
-                      <div key={i} style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        padding: '10px 0', borderBottom: '1px solid var(--grau-mid)',
-                        fontSize: 15
-                      }}>
-                        <div>
-                          <span style={{ fontWeight: 700 }}>
-                            {new Date(s.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                          </span>
-                          <span style={{ marginLeft: 10 }}>
-                            <span className={`badge badge-${s.art}`}>{s.art === 'wettkampf' ? 'Wettkampf' : 'Training'}</span>
-                          </span>
-                          <span style={{ marginLeft: 6 }}>{s.ort === 'heim' ? '🏠' : '✈️'}</span>
-                        </div>
-                        <div style={{ fontWeight: 700, color: 'var(--blau)', fontSize: 18 }}>{s.schnitt} Ø</div>
+                  {[...spieltage].reverse().map((s, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--grau-mid)', fontSize: 15 }}>
+                      <div>
+                        <span style={{ fontWeight: 700 }}>
+                          {new Date(s.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </span>
+                        <span className={`badge badge-${s.art}`} style={{ marginLeft: 8 }}>{s.art === 'wettkampf' ? 'WK' : 'TR'}</span>
+                        <span style={{ marginLeft: 6 }}>{s.ort === 'heim' ? '🏠' : '✈️'}</span>
                       </div>
-                    ))}
-                  </div>
+                      <div style={{ fontWeight: 700, color: 'var(--blau)', fontSize: 18 }}>{s.schnitt} Ø</div>
+                    </div>
+                  ))}
                 </>
               )}
             </div>
@@ -253,24 +420,20 @@ export default function Statistiken() {
             <div className="card">
               <div className="card-title" style={{ fontSize: 17 }}>📋 Alle Ergebnisse</div>
               {[...daten].reverse().map((e, i) => (
-                <div key={i} style={{
-                  padding: '14px 0',
-                  borderBottom: '1px solid var(--grau-mid)',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700 }}>
-                      {new Date(e.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                      {' '}· Runde {e.runde}
+                <div key={i} style={{ padding: '12px 0', borderBottom: '1px solid var(--grau-mid)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700 }}>
+                      {new Date(e.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} · Runde {e.runde}
                     </div>
                     <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--blau)' }}>{e.gesamt_punkte}</div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 14, color: 'var(--grau-text)' }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 13, color: 'var(--grau-text)' }}>
                     <span className={`badge badge-${e.art}`}>{e.art === 'wettkampf' ? 'Wettkampf' : 'Training'}</span>
-                    <span>{e.ort === 'heim' ? '🏠 Zuhause' : '✈️ Auswärts'}</span>
+                    <span>{e.ort === 'heim' ? '🏠' : '✈️'}</span>
                     <span>Volle: {e.volle_punkte}</span>
                     <span>Abräumen: {e.abraeumen_punkte}</span>
                     {e.gesamt_fehler > 0 && (
-                      <span style={{ color: 'var(--rot)', fontWeight: 700 }}>{e.gesamt_fehler} Fehler</span>
+                      <span style={{ color: 'var(--rot)', fontWeight: 700 }}>⚠️ {e.gesamt_fehler} Fehlwurf{e.gesamt_fehler !== 1 ? 'e' : ''}</span>
                     )}
                   </div>
                 </div>
