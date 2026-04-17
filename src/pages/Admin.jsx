@@ -150,6 +150,7 @@ export default function Admin() {
       adresse: ortEdit.adresse || null,
       zusatz:  ortEdit.zusatz  || null,
       maps_url: ortEdit.maps_url || null,
+      logo_url: ortEdit.logo_url || null,
     }).eq('id', id)
     if (error) { setOrtMeldung('Fehler: ' + error.message); return }
     setOrtBearbeite(null)
@@ -424,6 +425,10 @@ export default function Admin() {
 
                 {ortBearbeite === o.id && (
                   <div>
+                    <div className="form-group">
+                      <label>Logo-URL (optional)</label>
+                      <input type="text" value={ortEdit.logo_url || ''} onChange={e => setOrtEdit(p => ({ ...p, logo_url: e.target.value }))} placeholder="https://beispiel.de/logo.png" />
+                    </div>
                     <div className="form-group">
                       <label>Adresse (Straße, PLZ Ort)</label>
                       <input type="text" value={ortEdit.adresse} onChange={e => setOrtEdit(p => ({ ...p, adresse: e.target.value }))} placeholder="z.B. Musterstraße 1, 80000 München" />

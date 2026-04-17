@@ -117,33 +117,42 @@ export default function Statistiken() {
       </div>
 
       {/* Mitglieder wählen */}
-      <div className="card">
-        <div className="card-title">Spieler auswählen</div>
-        {mitglieder.map((m, i) => {
-          const idx = vergleichIds.indexOf(m.id)
-          const aktiv = idx !== -1
-          return (
-            <div key={i} onClick={() => toggleVergleich(m)} style={{
-              display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
-              borderBottom: '1px solid var(--grau-mid)', cursor: 'pointer'
-            }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: '50%',
-                background: aktiv ? FARBEN[idx] : 'var(--grau-mid)',
-                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 700, fontSize: 14, flexShrink: 0
-              }}>
-                {aktiv ? idx + 1 : ''}
-              </div>
-              <div style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>{m.name}</div>
-              {m.mannschaft && <div style={{ fontSize: 13, color: 'var(--grau-text)' }}>{m.mannschaft}. M</div>}
-              <div style={{ fontSize: 20, color: aktiv ? FARBEN[idx] : 'var(--grau-mid)' }}>
-                {aktiv ? '✓' : '+'}
-              </div>
+      {[1, 2, 3, null].map(gruppe => {
+        const gruppeMitglieder = mitglieder
+          .filter(m => m.mannschaft === gruppe)
+          .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+        if (gruppeMitglieder.length === 0) return null
+        return (
+          <div key={gruppe} className="card" style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 12, letterSpacing: 1 }}>
+              {gruppe ? `G${gruppe} – ${gruppe}. Mannschaft` : 'Ohne Mannschaft'}
             </div>
-          )
-        })}
-      </div>
+            {gruppeMitglieder.map((m, i) => {
+              const idx = vergleichIds.indexOf(m.id)
+              const aktiv = idx !== -1
+              return (
+                <div key={i} onClick={() => toggleVergleich(m)} style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
+                  borderBottom: '1px solid var(--grau-mid)', cursor: 'pointer'
+                }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: aktiv ? FARBEN[idx] : 'var(--grau-mid)',
+                    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 700, fontSize: 14, flexShrink: 0
+                  }}>
+                    {aktiv ? idx + 1 : ''}
+                  </div>
+                  <div style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>{m.name}</div>
+                  <div style={{ fontSize: 20, color: aktiv ? FARBEN[idx] : 'var(--grau-mid)' }}>
+                    {aktiv ? '✓' : '+'}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
 
       {/* Vergleichsauswertung */}
       {vergleichIds.length >= 2 && (
@@ -200,21 +209,28 @@ export default function Statistiken() {
         </button>
       </div>
 
-      <div className="card">
-        <p style={{ fontSize: 15, color: 'var(--grau-text)', marginBottom: 14 }}>
-          Tippe auf einen Namen um die Statistiken zu sehen.
-        </p>
-        {mitglieder.map((m, i) => (
-          <div key={i} className="mitglied-karte" onClick={() => waehle(m)}>
-            <div className="mitglied-avatar">{m.name.charAt(0).toUpperCase()}</div>
-            <div style={{ flex: 1 }}>
-              <div className="mitglied-name">{m.name}</div>
-              {m.mannschaft && <div style={{ fontSize: 13, color: 'var(--grau-text)' }}>{m.mannschaft}. Mannschaft</div>}
+      {[1, 2, 3, null].map(gruppe => {
+        const gruppeMitglieder = mitglieder
+          .filter(m => m.mannschaft === gruppe)
+          .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+        if (gruppeMitglieder.length === 0) return null
+        return (
+          <div key={gruppe} className="card" style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 12, letterSpacing: 1 }}>
+              {gruppe ? `G${gruppe} – ${gruppe}. Mannschaft` : 'Ohne Mannschaft'}
             </div>
-            <div style={{ color: 'var(--blau)', fontSize: 22 }}>›</div>
+            {gruppeMitglieder.map((m, i) => (
+              <div key={i} className="mitglied-karte" onClick={() => waehle(m)}>
+                <div className="mitglied-avatar">{m.name.charAt(0).toUpperCase()}</div>
+                <div style={{ flex: 1 }}>
+                  <div className="mitglied-name">{m.name}</div>
+                </div>
+                <div style={{ color: 'var(--blau)', fontSize: 22 }}>›</div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )
+      })}
     </div>
   )
 

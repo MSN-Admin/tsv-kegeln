@@ -70,11 +70,14 @@ export default function Auswaerts() {
               >
                 <div style={{
                   width: 42, height: 42, borderRadius: '50%',
-                  background: 'var(--blau)', color: 'white',
+                  background: o.logo_url ? '#f0f0f0' : 'var(--blau)', color: 'white',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 18, fontWeight: 700, flexShrink: 0
+                  fontSize: 18, fontWeight: 700, flexShrink: 0, overflow: 'hidden'
                 }}>
-                  {o.name.charAt(0)}
+                  {o.logo_url
+                    ? <img src={o.logo_url} alt={o.name} style={{ width: 42, height: 42, objectFit: 'contain' }} onError={e => { e.target.style.display='none' }} />
+                    : o.name.charAt(0)
+                  }
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 17 }}>{o.name}</div>
