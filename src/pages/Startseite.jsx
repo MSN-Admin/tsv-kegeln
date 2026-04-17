@@ -5,27 +5,34 @@ function getSaisonListe() {
   const heute = new Date()
   const aktJahr = heute.getMonth() >= 8 ? heute.getFullYear() : heute.getFullYear() - 1
   const liste = []
-  for (let j = aktJahr; j >= aktJahr - 4; j--) {
+  for (let j = aktJahr; j >= 2025; j--) {
     liste.push({ label: `${j}/${String(j + 1).slice(2)}`, start: `${j}-09-01`, end: `${j + 1}-04-30` })
   }
   return liste
 }
 
+function mannschaftLabel(m) {
+  if (!m) return ''
+  return `G${m}`
+}
+
 export default function Startseite({ nav }) {
   const saisonListe = getSaisonListe()
-  const [saisonIdx, setSaisonIdx]   = useState(0)
-  const [rangliste, setRangliste]   = useState([])
-  const [tage, setTage]             = useState([])
-  const [aufgeklappt, setAufgeklappt] = useState({})
+  const [saisonIdx, setSaisonIdx]       = useState(0)
+  const [rangliste, setRangliste]       = useState([])
+  const [tage, setTage]                 = useState([])
+  const [aufgeklappt, setAufgeklappt]   = useState({})
   const [naechsteTermine, setNaechsteTermine] = useState([])
   const [termineAufgeklappt, setTermineAufgeklappt] = useState(false)
-  const [laden, setLaden]           = useState(true)
+  const [laden, setLaden]               = useState(true)
 
   const saison = saisonListe[saisonIdx]
 
   useEffect(() => {
+    if (!saison) return
     async function load() {
       setLaden(true)
+      setAufgeklappt({})
 
       // Rangliste
       const { data: erg } = await supabase
@@ -56,13 +63,15 @@ export default function Startseite({ nav }) {
         setRangliste(liste)
       }
 
-      // Letzte Ergebnisse – nach Tag gruppiert
+      // Letzte Ergebnisse nach Tag gruppiert
       const { data: letzteErg } = await supabase
         .from('ergebnisse')
         .select('datum, art, ort, runde, gesamt_punkte, gesamt_fehler, mitglied_id, mitglieder(name, mannschaft)')
+        .gte('datum', saison.start)
+        .lte('datum', saison.end)
         .order('datum', { ascending: false })
         .order('erstellt_am', { ascending: false })
-        .limit(60)
+        .limit(80)
 
       if (letzteErg) {
         const tageMap = {}
@@ -71,11 +80,13 @@ export default function Startseite({ nav }) {
           if (!tageMap[key]) tageMap[key] = { datum: e.datum, art: e.art, ort: e.ort, spieler: {} }
           const sid = e.mitglied_id
           if (!tageMap[key].spieler[sid]) tageMap[key].spieler[sid] = {
-            name: e.mitglieder?.name, mannschaft: e.mitglieder?.mannschaft, runden: []
+            name: e.mitglieder?.name,
+            mannschaft: e.mitglieder?.mannschaft,
+            runden: []
           }
           tageMap[key].spieler[sid].runden.push(e.gesamt_punkte)
         }
-        const tageArr = Object.values(tageMap).slice(0, 8).map(t => ({
+        const tageArr = Object.values(tageMap).slice(0, 10).map(t => ({
           ...t,
           spieler: Object.values(t.spieler).map(s => ({
             ...s,
@@ -118,11 +129,7 @@ export default function Startseite({ nav }) {
     return new Date(d).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })
   }
 
-  function mannschaftLabel(m) {
-    if (!m) return ''
-    return `${m}. Mannschaft`
-  }
-
+  if (!saison) return <div className="empty">Noch keine Saison ab 2025/26 verfügbar.</div>
   if (laden) return <div className="loading">🎳 Lade Daten…</div>
 
   const ersterTermin = naechsteTermine[0]
@@ -130,7 +137,6 @@ export default function Startseite({ nav }) {
 
   return (
     <div>
-      {/* Hero */}
       <div className="hero">
         <div>
           <h2>TSV UG Kegeln</h2>
@@ -142,13 +148,9 @@ export default function Startseite({ nav }) {
       {/* Nächster Termin */}
       {ersterTermin && (
         <div className="card" style={{ borderLeft: '5px solid var(--gelb)' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 6, letterSpacing: 1 }}>
-            NÄCHSTER TERMIN
-          </div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--blau)', marginBottom: 4 }}>
-            {ersterTermin.titel}
-          </div>
-          <div style={{ fontSize: 14, color: 'var(--grau-text)', display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 6, letterSpacing: 1 }}>NÄCHSTER TERMIN</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--blau)', marginBottom: 4 }}>{ersterTermin.titel}</div>
+          <div style={{ fontSize: 14, color: 'var(--grau-text)', display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: weitereTermine.length > 0 ? 10 : 0 }}>
             <span>📅 {formatDatum(ersterTermin.datum)}</span>
             {ersterTermin.uhrzeit && <span>🕐 {ersterTermin.uhrzeit.slice(0, 5)} Uhr</span>}
             {ersterTermin.ort && <span>📍 {ersterTermin.ort}</span>}
@@ -158,10 +160,9 @@ export default function Startseite({ nav }) {
           )}
           {weitereTermine.length > 0 && (
             <>
-              <button
-                onClick={() => setTermineAufgeklappt(o => !o)}
+              <button onClick={() => setTermineAufgeklappt(o => !o)}
                 style={{ background: 'none', border: 'none', color: 'var(--blau)', fontSize: 14, fontWeight: 700, cursor: 'pointer', padding: 0 }}>
-                {termineAufgeklappt ? '▲ Weniger anzeigen' : `▼ ${weitereTermine.length} weitere Termine`}
+                {termineAufgeklappt ? '▲ Weniger' : `▼ ${weitereTermine.length} weitere Termine`}
               </button>
               {termineAufgeklappt && (
                 <div style={{ marginTop: 10 }}>
@@ -194,19 +195,13 @@ export default function Startseite({ nav }) {
         {/* Rangliste */}
         <div className="card">
           <div className="card-title">🏆 Rangliste</div>
-
-          {/* Saison wählen */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
             {saisonListe.map((s, i) => (
-              <button key={i}
-                onClick={() => setSaisonIdx(i)}
-                style={{
-                  padding: '4px 10px', fontSize: 13, fontWeight: 700, borderRadius: 6,
+              <button key={i} onClick={() => setSaisonIdx(i)}
+                style={{ padding: '4px 10px', fontSize: 13, fontWeight: 700, borderRadius: 6,
                   border: `2px solid ${i === saisonIdx ? 'var(--blau)' : 'var(--grau-mid)'}`,
                   background: i === saisonIdx ? 'var(--blau)' : 'var(--weiss)',
-                  color: i === saisonIdx ? 'var(--weiss)' : 'var(--grau-text)',
-                  cursor: 'pointer'
-                }}>
+                  color: i === saisonIdx ? 'var(--weiss)' : 'var(--grau-text)', cursor: 'pointer' }}>
                 {s.label}
               </button>
             ))}
@@ -222,7 +217,7 @@ export default function Startseite({ nav }) {
                   <div className="rang-name">{m.name}</div>
                   <div className="rang-sub">
                     {m.runden} Runden
-                    {m.mannschaft && <span style={{ marginLeft: 6, color: 'var(--blau)', fontWeight: 700 }}> · {m.mannschaft}. M</span>}
+                    {m.mannschaft && <span style={{ marginLeft: 6, color: 'var(--blau)', fontWeight: 700 }}>· {mannschaftLabel(m.mannschaft)}</span>}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -244,7 +239,7 @@ export default function Startseite({ nav }) {
           </button>
         </div>
 
-        {/* Letzte Ergebnisse – nach Tag gruppiert */}
+        {/* Letzte Ergebnisse */}
         <div className="card">
           <div className="card-title">📋 Letzte Ergebnisse</div>
           {tage.length === 0 ? (
@@ -258,14 +253,13 @@ export default function Startseite({ nav }) {
                 : '–'
               return (
                 <div key={ti} style={{ borderBottom: '1px solid var(--grau-mid)', paddingBottom: 10, marginBottom: 10 }}>
-                  {/* Kopfzeile Tag */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <div>
                       <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--blau)' }}>
                         {new Date(t.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                       </span>
                       <span className="badge" style={{ background: farbe.bg, color: farbe.color, marginLeft: 8, fontSize: 11 }}>
-                        {t.art === 'wettkampf' ? 'WK' : 'TR'}
+                        {t.art === 'wettkampf' ? 'Wettkampf' : 'Training'}
                       </span>
                       <span style={{ fontSize: 12, marginLeft: 6 }}>{t.ort === 'heim' ? '🏠' : '✈️'}</span>
                     </div>
@@ -274,21 +268,17 @@ export default function Startseite({ nav }) {
                       <div style={{ fontSize: 11, color: 'var(--grau-text)' }}>{t.spieler.length} Spieler</div>
                     </div>
                   </div>
-
-                  {/* Aufklappen */}
-                  <button
-                    onClick={() => setAufgeklappt(p => ({ ...p, [ti]: !p[ti] }))}
+                  <button onClick={() => setAufgeklappt(p => ({ ...p, [ti]: !p[ti] }))}
                     style={{ background: 'none', border: 'none', color: 'var(--blau)', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}>
                     {offen ? '▲ Einklappen' : '▼ Details'}
                   </button>
-
                   {offen && (
                     <div style={{ marginTop: 8 }}>
                       {t.spieler.map((s, si) => (
                         <div key={si} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderTop: '1px solid #f0f0f0' }}>
                           <div>
                             <span style={{ fontWeight: 600, fontSize: 14 }}>{s.name}</span>
-                            {s.mannschaft && <span style={{ fontSize: 11, color: 'var(--grau-text)', marginLeft: 6 }}>{s.mannschaft}. M</span>}
+                            {s.mannschaft && <span style={{ fontSize: 11, color: 'var(--grau-text)', marginLeft: 6 }}>{mannschaftLabel(s.mannschaft)}</span>}
                             <div style={{ fontSize: 12, color: 'var(--grau-text)' }}>{s.runden.length} Runde{s.runden.length !== 1 ? 'n' : ''}</div>
                           </div>
                           <div style={{ textAlign: 'right' }}>

@@ -9,27 +9,37 @@ export default function Admin() {
   const [pwFehler, setPwFehler]     = useState('')
   const [tab, setTab]               = useState('termine')
 
-  const [mitglieder, setMitglieder] = useState([])
-  const [mName, setMName]           = useState('')
-  const [mPin, setMPin]             = useState('')
-  const [mEintritt, setMEintritt]   = useState('')
+  // Mitglieder
+  const [mitglieder, setMitglieder]   = useState([])
+  const [mName, setMName]             = useState('')
+  const [mPin, setMPin]               = useState('')
+  const [mEintritt, setMEintritt]     = useState('')
   const [mMannschaft, setMMannschaft] = useState('')
-  const [mMeldung, setMMeldung]     = useState('')
+  const [mMeldung, setMMeldung]       = useState('')
 
-  const [termine, setTermine]             = useState([])
-  const [tTitel, setTTitel]               = useState('')
-  const [tDatum, setTDatum]               = useState('')
-  const [tUhrzeit, setTUhrzeit]           = useState('')
-  const [tOrt, setTOrt]                   = useState('')
-  const [tBeschreibung, setTBeschreibung] = useState('')
-  const [tArt, setTArt]                   = useState('sonstiges')
-  const [tMeldung, setTMeldung]           = useState('')
+  // Termine
+  const [termine, setTermine]               = useState([])
+  const [tTitel, setTTitel]                 = useState('')
+  const [tDatum, setTDatum]                 = useState('')
+  const [tUhrzeit, setTUhrzeit]             = useState('')
+  const [tOrt, setTOrt]                     = useState('')
+  const [tBeschreibung, setTBeschreibung]   = useState('')
+  const [tArt, setTArt]                     = useState('sonstiges')
+  const [tMeldung, setTMeldung]             = useState('')
 
+  // Ergebnisse
   const [ergebnisse, setErgebnisse] = useState([])
   const [ergFilter, setErgFilter]   = useState('')
   const [bearbeite, setBearbeite]   = useState(null)
   const [editWerte, setEditWerte]   = useState({})
   const [ergMeldung, setErgMeldung] = useState('')
+
+  // Auswärtsorte
+  const [orte, setOrte]             = useState([])
+  const [ortBearbeite, setOrtBearbeite] = useState(null)
+  const [ortEdit, setOrtEdit]       = useState({})
+  const [ortMeldung, setOrtMeldung] = useState('')
+  const [neuerOrtName, setNeuerOrtName] = useState('')
 
   function login() {
     if (pw === ADMIN_PASSWORT) { setEingeloggt(true); ladeAlles() }
@@ -41,6 +51,8 @@ export default function Admin() {
     setMitglieder(m || [])
     const { data: t } = await supabase.from('termine').select('*').order('datum')
     setTermine(t || [])
+    const { data: o } = await supabase.from('auswaertsorte').select('*').order('name')
+    setOrte(o || [])
     await ladeErgebnisse()
   }
 
@@ -49,11 +61,11 @@ export default function Admin() {
       .from('ergebnisse')
       .select('id, datum, art, ort, runde, volle_punkte, volle_fehler, abraeumen_punkte, abraeumen_fehler, gesamt_punkte, gesamt_fehler, mitglied_id, mitglieder(name)')
       .order('datum', { ascending: false })
-      .order('mitglied_id')
-      .order('runde')
+      .order('mitglied_id').order('runde')
     setErgebnisse(data || [])
   }
 
+  // Mitglieder
   async function mitgliedAnlegen() {
     setMMeldung('')
     const { error } = await supabase.from('mitglieder').insert({
@@ -84,6 +96,7 @@ export default function Admin() {
     alert('PIN geändert.')
   }
 
+  // Termine
   async function terminAnlegen() {
     setTMeldung('')
     const { error } = await supabase.from('termine').insert({
@@ -98,11 +111,12 @@ export default function Admin() {
   }
 
   async function terminLoeschen(id) {
-    if (!confirm('Termin wirklich löschen?')) return
+    if (!confirm('Termin löschen?')) return
     await supabase.from('termine').delete().eq('id', id)
     ladeAlles()
   }
 
+  // Ergebnisse
   function startBearbeiten(e) {
     setBearbeite(e.id)
     setEditWerte({ volle_punkte: e.volle_punkte, volle_fehler: e.volle_fehler, abraeumen_punkte: e.abraeumen_punkte, abraeumen_fehler: e.abraeumen_fehler })
@@ -110,7 +124,6 @@ export default function Admin() {
   }
 
   async function ergebnisSpeichern(id) {
-    setErgMeldung('')
     const { error } = await supabase.from('ergebnisse').update({
       volle_punkte: parseInt(editWerte.volle_punkte),
       volle_fehler: parseInt(editWerte.volle_fehler) || 0,
@@ -125,9 +138,41 @@ export default function Admin() {
   }
 
   async function ergebnisLoeschen(id) {
-    if (!confirm('Ergebnis wirklich löschen?')) return
+    if (!confirm('Ergebnis löschen?')) return
     await supabase.from('ergebnisse').delete().eq('id', id)
     await ladeErgebnisse()
+  }
+
+  // Auswärtsorte
+  async function ortSpeichern(id) {
+    setOrtMeldung('')
+    const { error } = await supabase.from('auswaertsorte').update({
+      adresse: ortEdit.adresse || null,
+      zusatz:  ortEdit.zusatz  || null,
+      maps_url: ortEdit.maps_url || null,
+    }).eq('id', id)
+    if (error) { setOrtMeldung('Fehler: ' + error.message); return }
+    setOrtBearbeite(null)
+    setOrtMeldung('✓ Gespeichert!')
+    const { data } = await supabase.from('auswaertsorte').select('*').order('name')
+    setOrte(data || [])
+    setTimeout(() => setOrtMeldung(''), 3000)
+  }
+
+  async function ortAnlegen() {
+    if (!neuerOrtName.trim()) return
+    const { error } = await supabase.from('auswaertsorte').insert({ name: neuerOrtName.trim() })
+    if (error) { setOrtMeldung('Fehler: ' + error.message); return }
+    setNeuerOrtName('')
+    const { data } = await supabase.from('auswaertsorte').select('*').order('name')
+    setOrte(data || [])
+  }
+
+  async function ortLoeschen(id) {
+    if (!confirm('Verein löschen?')) return
+    await supabase.from('auswaertsorte').delete().eq('id', id)
+    const { data } = await supabase.from('auswaertsorte').select('*').order('name')
+    setOrte(data || [])
   }
 
   const gefilterteErg = ergFilter
@@ -135,7 +180,7 @@ export default function Admin() {
     : ergebnisse
 
   function fD(d) { return d ? new Date(d).toLocaleDateString('de-DE') : '–' }
-  function fU(t) { return t ? t.slice(0,5)+' Uhr' : '–' }
+  function fU(t) { return t ? t.slice(0, 5) + ' Uhr' : '–' }
 
   const editInput = { width: '100%', padding: '6px 8px', fontSize: 15, border: '2px solid #003D8F', borderRadius: 6, textAlign: 'right', fontWeight: 700 }
 
@@ -153,27 +198,29 @@ export default function Admin() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
-        {[{ key: 'termine', label: '📅 Termine' }, { key: 'ergebnisse', label: '🎳 Ergebnisse' }, { key: 'mitglieder', label: '👥 Mitglieder' }].map(t => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 20 }}>
+        {[
+          { key: 'termine',    label: '📅 Termine' },
+          { key: 'ergebnisse', label: '🎳 Ergebnisse' },
+          { key: 'mitglieder', label: '👥 Mitglieder' },
+          { key: 'orte',       label: '✈️ Auswärts' },
+        ].map(t => (
           <button key={t.key} className={tab === t.key ? 'btn btn-primary' : 'btn btn-outline'}
-            style={{ fontSize: 14, padding: '10px 8px' }} onClick={() => setTab(t.key)}>
+            style={{ fontSize: 13, padding: '10px 6px' }} onClick={() => setTab(t.key)}>
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* TERMINE */}
+      {/* ── TERMINE ── */}
       {tab === 'termine' && (
         <div>
           <div className="card">
             <div className="card-title">Termin anlegen</div>
-            <div className="form-group">
-              <label>Titel</label>
-              <input type="text" value={tTitel} onChange={e => setTTitel(e.target.value)} placeholder="z.B. Vereinstraining" />
-            </div>
+            <div className="form-group"><label>Titel</label><input type="text" value={tTitel} onChange={e => setTTitel(e.target.value)} placeholder="z.B. Vereinstraining" /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group"><label>Datum</label><input type="date" value={tDatum} onChange={e => setTDatum(e.target.value)} /></div>
-              <div className="form-group"><label>Uhrzeit (optional)</label><input type="time" value={tUhrzeit} onChange={e => setTUhrzeit(e.target.value)} /></div>
+              <div className="form-group"><label>Uhrzeit</label><input type="time" value={tUhrzeit} onChange={e => setTUhrzeit(e.target.value)} /></div>
               <div className="form-group">
                 <label>Art</label>
                 <select value={tArt} onChange={e => setTArt(e.target.value)}>
@@ -182,37 +229,35 @@ export default function Admin() {
                   <option value="sonstiges">Sonstiges</option>
                 </select>
               </div>
-              <div className="form-group"><label>Ort (optional)</label><input type="text" value={tOrt} onChange={e => setTOrt(e.target.value)} /></div>
+              <div className="form-group"><label>Ort</label><input type="text" value={tOrt} onChange={e => setTOrt(e.target.value)} /></div>
             </div>
-            <div className="form-group"><label>Beschreibung (optional)</label><input type="text" value={tBeschreibung} onChange={e => setTBeschreibung(e.target.value)} /></div>
+            <div className="form-group"><label>Beschreibung</label><input type="text" value={tBeschreibung} onChange={e => setTBeschreibung(e.target.value)} /></div>
             {tMeldung && <p style={{ color: tMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)', fontSize: 14, marginBottom: 12 }}>{tMeldung}</p>}
             <button className="btn btn-gelb btn-voll" onClick={terminAnlegen} disabled={!tTitel || !tDatum}>Termin anlegen</button>
           </div>
           <div className="card">
             <div className="card-title">Alle Termine ({termine.length})</div>
-            {termine.length === 0 ? <div className="empty">Noch keine Termine.</div> : (
-              <div className="table-wrap">
-                <table>
-                  <thead><tr><th>Datum</th><th>Zeit</th><th>Titel</th><th>Art</th><th>Ort</th><th></th></tr></thead>
-                  <tbody>
-                    {termine.map((t, i) => (
-                      <tr key={i}>
-                        <td>{fD(t.datum)}</td><td>{fU(t.uhrzeit)}</td>
-                        <td style={{ fontWeight: 600 }}>{t.titel}</td>
-                        <td><span className={`badge badge-${t.art}`}>{t.art}</span></td>
-                        <td style={{ color: 'var(--grau-text)' }}>{t.ort || '–'}</td>
-                        <td><button onClick={() => terminLoeschen(t.id)} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 14 }}>löschen</button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Datum</th><th>Zeit</th><th>Titel</th><th>Art</th><th>Ort</th><th></th></tr></thead>
+                <tbody>
+                  {termine.map((t, i) => (
+                    <tr key={i}>
+                      <td>{fD(t.datum)}</td><td>{fU(t.uhrzeit)}</td>
+                      <td style={{ fontWeight: 600 }}>{t.titel}</td>
+                      <td><span className={`badge badge-${t.art}`}>{t.art}</span></td>
+                      <td style={{ color: 'var(--grau-text)' }}>{t.ort || '–'}</td>
+                      <td><button onClick={() => terminLoeschen(t.id)} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer' }}>löschen</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ERGEBNISSE */}
+      {/* ── ERGEBNISSE ── */}
       {tab === 'ergebnisse' && (
         <div className="card">
           <div className="card-title">🎳 Ergebnisse bearbeiten</div>
@@ -261,7 +306,7 @@ export default function Admin() {
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                  {[['Volle', e.volle_punkte, false], ['Abräumen', e.abraeumen_punkte, false], ['Gesamt', e.gesamt_punkte, true], ['Fehler', e.gesamt_fehler, false]].map(([l, v, h]) => (
+                  {[['Volle', e.volle_punkte, false],['Abräumen', e.abraeumen_punkte, false],['Gesamt', e.gesamt_punkte, true],['Fehler', e.gesamt_fehler, false]].map(([l, v, h]) => (
                     <div key={l} style={{ textAlign: 'center', background: h ? '#003D8F' : '#fff', borderRadius: 6, padding: '6px 4px' }}>
                       <div style={{ fontSize: 18, fontWeight: 700, color: h ? '#fff' : '#003D8F' }}>{v}</div>
                       <div style={{ fontSize: 11, color: h ? 'rgba(255,255,255,0.7)' : 'var(--grau-text)' }}>{l}</div>
@@ -274,24 +319,24 @@ export default function Admin() {
         </div>
       )}
 
-      {/* MITGLIEDER */}
+      {/* ── MITGLIEDER ── */}
       {tab === 'mitglieder' && (
         <div>
           <div className="card">
             <div className="card-title">Mitglied anlegen</div>
             <div className="form-group"><label>Name</label><input type="text" value={mName} onChange={e => setMName(e.target.value)} placeholder="Vorname Nachname" /></div>
-            <div className="form-group"><label>PIN (4–6 Stellen)</label><input type="text" maxLength={6} value={mPin} onChange={e => setMPin(e.target.value)} placeholder="z.B. 1234" /></div>
+            <div className="form-group"><label>PIN (4–6 Stellen)</label><input type="text" maxLength={6} value={mPin} onChange={e => setMPin(e.target.value)} placeholder="1234" /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group">
                 <label>Mannschaft</label>
                 <select value={mMannschaft} onChange={e => setMMannschaft(e.target.value)}>
                   <option value="">– keine –</option>
-                  <option value="1">1. Mannschaft</option>
-                  <option value="2">2. Mannschaft</option>
-                  <option value="3">3. Mannschaft</option>
+                  <option value="1">G1</option>
+                  <option value="2">G2</option>
+                  <option value="3">G3</option>
                 </select>
               </div>
-              <div className="form-group"><label>Eintrittsdatum (optional)</label><input type="date" value={mEintritt} onChange={e => setMEintritt(e.target.value)} /></div>
+              <div className="form-group"><label>Eintrittsdatum</label><input type="date" value={mEintritt} onChange={e => setMEintritt(e.target.value)} /></div>
             </div>
             {mMeldung && <p style={{ color: mMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)', fontSize: 14, marginBottom: 12 }}>{mMeldung}</p>}
             <button className="btn btn-gelb btn-voll" onClick={mitgliedAnlegen} disabled={!mName || !mPin}>Mitglied anlegen</button>
@@ -309,9 +354,9 @@ export default function Admin() {
                         <select value={m.mannschaft || ''} onChange={e => mannschaftAendern(m, e.target.value)}
                           style={{ fontSize: 14, border: '1px solid var(--grau-mid)', borderRadius: 6, padding: '4px 8px' }}>
                           <option value="">–</option>
-                          <option value="1">1. M</option>
-                          <option value="2">2. M</option>
-                          <option value="3">3. M</option>
+                          <option value="1">G1</option>
+                          <option value="2">G2</option>
+                          <option value="3">G3</option>
                         </select>
                       </td>
                       <td>
@@ -329,6 +374,76 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── AUSWÄRTSORTE ── */}
+      {tab === 'orte' && (
+        <div>
+          <div className="card">
+            <div className="card-title">✈️ Auswärtsverein anlegen</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <input type="text" value={neuerOrtName} onChange={e => setNeuerOrtName(e.target.value)}
+                placeholder="Vereinsname" style={{ flex: 1, padding: '12px', fontSize: 16, border: '2px solid var(--grau-mid)', borderRadius: 10 }} />
+              <button className="btn btn-primary" onClick={ortAnlegen} disabled={!neuerOrtName.trim()}>
+                + Anlegen
+              </button>
+            </div>
+          </div>
+
+          {ortMeldung && (
+            <div style={{ background: ortMeldung.startsWith('Fehler') ? '#fde8e8' : '#d4edda', border: `2px solid ${ortMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontWeight: 700, fontSize: 15, color: ortMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)' }}>
+              {ortMeldung}
+            </div>
+          )}
+
+          <div className="card">
+            <div className="card-title">Alle Vereine ({orte.length})</div>
+            {orte.map((o, i) => (
+              <div key={i} style={{ border: `2px solid ${ortBearbeite === o.id ? '#003D8F' : 'var(--grau-mid)'}`, borderRadius: 10, padding: 14, marginBottom: 10, background: ortBearbeite === o.id ? '#f0f4ff' : 'var(--grau-hell)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: ortBearbeite === o.id ? 12 : 0 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 16 }}>{o.name}</div>
+                    {o.adresse && <div style={{ fontSize: 13, color: 'var(--grau-text)', marginTop: 2 }}>{o.adresse}</div>}
+                    {!o.adresse && <div style={{ fontSize: 13, color: '#bbb', marginTop: 2 }}>Noch keine Adresse</div>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {ortBearbeite !== o.id && (
+                      <button onClick={() => { setOrtBearbeite(o.id); setOrtEdit({ adresse: o.adresse || '', zusatz: o.zusatz || '', maps_url: o.maps_url || '' }) }}
+                        style={{ background: 'none', border: '2px solid #003D8F', color: '#003D8F', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                        ✏️ Bearbeiten
+                      </button>
+                    )}
+                    <button onClick={() => ortLoeschen(o.id)}
+                      style={{ background: 'none', border: '2px solid #c0392b', color: '#c0392b', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+
+                {ortBearbeite === o.id && (
+                  <div>
+                    <div className="form-group">
+                      <label>Adresse (Straße, PLZ Ort)</label>
+                      <input type="text" value={ortEdit.adresse} onChange={e => setOrtEdit(p => ({ ...p, adresse: e.target.value }))} placeholder="z.B. Musterstraße 1, 80000 München" />
+                    </div>
+                    <div className="form-group">
+                      <label>Hinweis (optional)</label>
+                      <input type="text" value={ortEdit.zusatz} onChange={e => setOrtEdit(p => ({ ...p, zusatz: e.target.value }))} placeholder="z.B. Parkplatz hinter dem Gebäude" />
+                    </div>
+                    <div className="form-group">
+                      <label>Maps-Link (optional, überschreibt Auto-Link)</label>
+                      <input type="text" value={ortEdit.maps_url} onChange={e => setOrtEdit(p => ({ ...p, maps_url: e.target.value }))} placeholder="https://maps.google.com/…" />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn btn-gruen" style={{ flex: 1 }} onClick={() => ortSpeichern(o.id)}>✓ Speichern</button>
+                      <button className="btn btn-outline" onClick={() => setOrtBearbeite(null)}>Abbrechen</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
