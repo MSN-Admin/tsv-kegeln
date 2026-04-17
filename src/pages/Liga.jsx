@@ -205,43 +205,139 @@ export default function Liga() {
 }
 
 function SpielZeile({ s, formatDatum }) {
-  const tsvHeim = istTSV(s.heim)
-  const tsvGast = istTSV(s.gast)
+  const [offen, setOffen]       = useState(false)
+  const [details, setDetails]   = useState(null)
+  const [ladenDet, setLadenDet] = useState(false)
+
+  const tsvHeim  = istTSV(s.heim)
+  const tsvGast  = istTSV(s.gast)
   const beteiligt = tsvHeim || tsvGast
-  const gespielt = s.status !== 'offen'
+  const gespielt  = s.status !== 'offen'
+
+  async function toggleDetails() {
+    if (offen) { setOffen(false); return }
+    setOffen(true)
+    if (details || !gespielt) return
+    setLadenDet(true)
+    const data = await callSportwinner('GetSpielerInfo', { id_spiel: s.id })
+    setDetails(Array.isArray(data) ? data : null)
+    setLadenDet(false)
+  }
+
+  // Datenstruktur: [Name, R1, R2, R3, R4, Kegel_h, SP_h, MP_h, MP_g, SP_g, Kegel_g, R4_g, R3_g, R2_g, R1_g, Name_g]
+  // Letzte Zeile = Summe
+  const spieler = details ? details.slice(0, -1) : []
+  const summe   = details ? details[details.length - 1] : null
 
   return (
-    <div style={{
-      padding: '12px 0',
-      borderBottom: '1px solid var(--grau-mid)',
-      background: beteiligt ? '#fffbf0' : 'transparent',
-    }}>
-      <div style={{ fontSize: 12, color: 'var(--grau-text)', marginBottom: 4, display: 'flex', gap: 8 }}>
-        <span>{formatDatum(s.datum)}</span>
-        {s.uhrzeit && s.uhrzeit !== '00:00' && <span>{s.uhrzeit} Uhr</span>}
-        {s.spieltag && <span>· Spieltag {s.spieltag}</span>}
-        {beteiligt && <span style={{ color: '#7a5800', fontWeight: 700 }}>⭐ TSV</span>}
+    <div style={{ borderBottom: '1px solid var(--grau-mid)', background: beteiligt ? '#fffbf0' : 'transparent' }}>
+      {/* Kopfzeile */}
+      <div
+        onClick={gespielt ? toggleDetails : undefined}
+        style={{ padding: '12px 0', cursor: gespielt ? 'pointer' : 'default' }}
+      >
+        <div style={{ fontSize: 12, color: 'var(--grau-text)', marginBottom: 4, display: 'flex', gap: 8 }}>
+          <span>{formatDatum(s.datum)}</span>
+          {s.uhrzeit && s.uhrzeit !== '00:00' && <span>{s.uhrzeit} Uhr</span>}
+          {s.spieltag && <span>· Spieltag {s.spieltag}</span>}
+          {beteiligt && <span style={{ color: '#7a5800', fontWeight: 700 }}>⭐ TSV</span>}
+          {gespielt && <span style={{ marginLeft: 'auto', color: 'var(--blau)', fontSize: 12 }}>{offen ? '▲' : '▼'}</span>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1, fontWeight: tsvHeim ? 700 : 600, fontSize: 14, color: tsvHeim ? 'var(--blau)' : 'var(--text)' }}>
+            {s.heim || '–'}
+          </div>
+          <div style={{
+            minWidth: 80, textAlign: 'center',
+            background: gespielt ? 'var(--blau)' : 'var(--grau-mid)',
+            color: gespielt ? 'white' : 'var(--grau-text)',
+            borderRadius: 8, padding: '5px 10px',
+            fontWeight: 700, fontSize: gespielt ? 15 : 13,
+          }}>
+            {gespielt ? (s.mp || '–') : (s.uhrzeit && s.uhrzeit !== '00:00' ? s.uhrzeit : '–:–')}
+          </div>
+          <div style={{ flex: 1, fontWeight: tsvGast ? 700 : 600, fontSize: 14, textAlign: 'right', color: tsvGast ? 'var(--blau)' : 'var(--text)' }}>
+            {s.gast || '–'}
+          </div>
+        </div>
+        {gespielt && s.sp && (
+          <div style={{ fontSize: 12, color: 'var(--grau-text)', textAlign: 'center', marginTop: 3 }}>
+            SP: {s.sp}
+          </div>
+        )}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ flex: 1, fontWeight: tsvHeim ? 700 : 600, fontSize: 14, color: tsvHeim ? 'var(--blau)' : 'var(--text)' }}>
-          {s.heim || '–'}
-        </div>
-        <div style={{
-          minWidth: 80, textAlign: 'center',
-          background: gespielt ? 'var(--blau)' : 'var(--grau-mid)',
-          color: gespielt ? 'white' : 'var(--grau-text)',
-          borderRadius: 8, padding: '5px 10px',
-          fontWeight: 700, fontSize: gespielt ? 15 : 13,
-        }}>
-          {gespielt ? (s.mp || '–') : (s.uhrzeit && s.uhrzeit !== '00:00' ? s.uhrzeit : '–:–')}
-        </div>
-        <div style={{ flex: 1, fontWeight: tsvGast ? 700 : 600, fontSize: 14, textAlign: 'right', color: tsvGast ? 'var(--blau)' : 'var(--text)' }}>
-          {s.gast || '–'}
-        </div>
-      </div>
-      {gespielt && s.sp && (
-        <div style={{ fontSize: 12, color: 'var(--grau-text)', textAlign: 'center', marginTop: 3 }}>
-          SP: {s.sp}
+
+      {/* Detail-Tabelle */}
+      {offen && gespielt && (
+        <div style={{ paddingBottom: 12, overflowX: 'auto' }}>
+          {ladenDet ? (
+            <div style={{ fontSize: 13, color: 'var(--grau-text)', padding: '8px 0' }}>Lade Details…</div>
+          ) : details ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
+              <thead>
+                <tr style={{ background: 'var(--blau)', color: 'white' }}>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700 }}>{s.heim}</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'right' }}>1</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'right' }}>2</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'right' }}>3</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'right' }}>4</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'right', borderRight: '2px solid rgba(255,255,255,0.3)' }}>Kegel</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'center' }}>SP</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'center', borderRight: '2px solid rgba(255,255,255,0.3)' }}>MP</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'center' }}>MP</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'center' }}>SP</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'right', borderLeft: '2px solid rgba(255,255,255,0.3)' }}>Kegel</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'right' }}>4</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'right' }}>3</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'right' }}>2</th>
+                  <th style={{ padding: '6px 4px', textAlign: 'right' }}>1</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700 }}>{s.gast}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {spieler.map((z, i) => {
+                  const tsvSpieler = istTSV(s.heim)
+                  return (
+                    <tr key={i} style={{ background: i % 2 === 0 ? 'var(--grau-hell)' : 'white' }}>
+                      <td style={{ padding: '5px 8px', fontWeight: 600, color: tsvSpieler ? 'var(--blau)' : 'inherit' }}>{z[0]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'right' }}>{z[1]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'right' }}>{z[2]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'right' }}>{z[3]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'right' }}>{z[4]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'right', fontWeight: 700, borderRight: '2px solid var(--grau-mid)' }}>{z[5]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'center' }}>{z[6]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'center', fontWeight: 700, borderRight: '2px solid var(--grau-mid)' }}>{z[7]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'center', fontWeight: 700 }}>{z[8]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'center' }}>{z[9]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'right', fontWeight: 700, borderLeft: '2px solid var(--grau-mid)' }}>{z[10]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'right' }}>{z[11]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'right' }}>{z[12]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'right' }}>{z[13]}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'right' }}>{z[14]}</td>
+                      <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>{z[15]}</td>
+                    </tr>
+                  )
+                })}
+                {/* Summenzeile */}
+                {summe && (
+                  <tr style={{ background: 'var(--blau)', color: 'white', fontWeight: 700 }}>
+                    <td style={{ padding: '6px 8px' }}>Gesamt</td>
+                    <td colSpan={4}></td>
+                    <td style={{ padding: '6px 4px', textAlign: 'right', borderRight: '2px solid rgba(255,255,255,0.3)' }}>{summe[5]}</td>
+                    <td style={{ padding: '6px 4px', textAlign: 'center' }}>{summe[6]}</td>
+                    <td style={{ padding: '6px 4px', textAlign: 'center', borderRight: '2px solid rgba(255,255,255,0.3)' }}>{summe[7]}</td>
+                    <td style={{ padding: '6px 4px', textAlign: 'center' }}>{summe[8]}</td>
+                    <td style={{ padding: '6px 4px', textAlign: 'center' }}>{summe[9]}</td>
+                    <td style={{ padding: '6px 4px', textAlign: 'right', borderLeft: '2px solid rgba(255,255,255,0.3)' }}>{summe[10]}</td>
+                    <td colSpan={4}></td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}></td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--grau-text)', padding: '8px 0' }}>Keine Details verfügbar.</div>
+          )}
         </div>
       )}
     </div>
