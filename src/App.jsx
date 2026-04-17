@@ -28,15 +28,7 @@ export default function App() {
     <div>
       <header className="header">
         <div className="header-logo" onClick={() => navigiere('start')}>
-          <img
-            src="/tsv-logo.svg"
-            alt="TSV UG Logo"
-            style={{
-              width: 48, height: 48,
-              objectFit: 'contain',
-              objectPosition: 'center'
-            }}
-          />
+         <img src="/tsv-logo.svg" alt="TSV UG Logo" style={{ width: 48, height: 48 }} />
           <div>
             <h1>TSV UG Kegeln</h1>
             <span>Unterpfaffenhofen-Germering e.V.</span>
