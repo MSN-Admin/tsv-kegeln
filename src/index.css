@@ -53,9 +53,8 @@ a { color: var(--blau); text-decoration: none; }
 }
 
 .header-logo img {
-  height: 38px;
-  width: auto;
-  filter: brightness(0) invert(1);
+  height: 48px;
+  width: 48px;
 }
 
 .header-logo h1 {
