@@ -137,13 +137,6 @@ export default function Startseite({ nav }) {
 
   return (
     <div>
-      <div className="hero">
-        <div>
-          <h2>TSV UG Kegeln</h2>
-          <p>Saison {saison.label}</p>
-        </div>
-        <div className="hero-kegel">🎳</div>
-      </div>
 
       {/* Nächster Termin */}
       {ersterTermin && (

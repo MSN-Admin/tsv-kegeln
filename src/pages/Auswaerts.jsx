@@ -18,12 +18,13 @@ export default function Auswaerts() {
 
   function mapsLink(adresse) {
     if (!adresse) return null
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(adresse)}`
+    // Direkte Routenberechnung von aktuellem Standort zur Adresse
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(adresse)}`
   }
 
   function appleMapsLink(adresse) {
     if (!adresse) return null
-    return `https://maps.apple.com/?q=${encodeURIComponent(adresse)}`
+    return `https://maps.apple.com/?daddr=${encodeURIComponent(adresse)}&dirflg=d`
   }
 
   if (laden) return <div className="loading">Lade Vereine…</div>
