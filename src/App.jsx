@@ -10,13 +10,13 @@ import Liga        from './pages/Liga'
 import Admin       from './pages/Admin'
 
 const SEITEN = [
-  { key: 'start',       label: 'Start' },
-  { key: 'termine',     label: 'Termine' },
+  { key: 'start',       label: '🏠 Start' },
+  { key: 'termine',     label: '📅 Termine' },
   { key: 'liga',        label: '🏆 Liga' },
-  { key: 'statistiken', label: 'Statistiken' },
+  { key: 'statistiken', label: '📊 Statistiken' },
   { key: 'auswaerts',   label: '✈️ Auswärts' },
-  { key: 'eintragen',   label: '+ Ergebnis' },
-  { key: 'admin',       label: 'Admin' },
+  { key: 'eintragen',   label: '🎳 Ergebnis' },
+  { key: 'admin',       label: '⚙️ Admin' },
 ]
 
 export default function App() {
