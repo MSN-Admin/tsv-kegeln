@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../supabaseClient'
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sportwinner`
-const ID_SAISON = 11
 
 const LIGEN = [
   { label: 'G1 – Kreisliga 1', id_liga: 4095 },
@@ -10,7 +8,7 @@ const LIGEN = [
   { label: 'G3 – Kreisliga 3', id_liga: 4099 },
 ]
 
-const TSV_NAMEN = ['TSV Upf.-Germering', 'TSV Upf', 'Germering', 'TSV UG']
+const TSV_NAMEN = ['TSV Upf', 'Germering', 'TSV UG']
 
 function istTSV(name) {
   if (!name) return false
@@ -18,35 +16,37 @@ function istTSV(name) {
 }
 
 async function callSportwinner(command, params = {}) {
-  const { data: { session } } = await supabase.auth.getSession()
+  const body = { command, id_saison: '11', ...Object.fromEntries(Object.entries(params).map(([k,v]) => [k, String(v)])) }
   const res = await fetch(FUNCTION_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({ command, id_saison: ID_SAISON, ...params }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   })
-  return res.json()
+  const json = await res.json()
+  // Edge function gibt { status, body } zurück
+  if (json.body) {
+    try { return JSON.parse(json.body) } catch { return null }
+  }
+  return json
 }
 
 export default function Liga() {
-  const [ligaIdx, setLigaIdx]     = useState(0)
-  const [tabelle, setTabelle]     = useState([])
-  const [spiele, setSpiele]       = useState([])
-  const [ansicht, setAnsicht]     = useState('tabelle')
-  const [laden, setLaden]         = useState(false)
-  const [fehler, setFehler]       = useState(null)
+  const [ligaIdx, setLigaIdx]   = useState(0)
+  const [tabelle, setTabelle]   = useState([])
+  const [spiele, setSpiele]     = useState([])
+  const [ansicht, setAnsicht]   = useState('tabelle')
+  const [laden, setLaden]       = useState(false)
+  const [fehler, setFehler]     = useState(null)
 
   const liga = LIGEN[ligaIdx]
 
-  useEffect(() => {
-    ladeDaten()
-  }, [ligaIdx])
+  useEffect(() => { ladeDaten() }, [ligaIdx])
 
   async function ladeDaten() {
     setLaden(true)
     setFehler(null)
+    setTabelle([])
+    setSpiele([])
     try {
       const [tabData, spielData] = await Promise.all([
         callSportwinner('GetTabelle', { id_liga: liga.id_liga, nr_spieltag: 100, sort: 0 }),
@@ -56,25 +56,19 @@ export default function Liga() {
           art_kreis: 1, art_liga: 0, art_spieltag: 0
         }),
       ])
-      setTabelle(Array.isArray(tabData) ? tabData : tabData?.tabelle || [])
-      setSpiele(Array.isArray(spielData) ? spielData : spielData?.spiele || [])
+      setTabelle(Array.isArray(tabData) ? tabData : [])
+      setSpiele(Array.isArray(spielData) ? spielData : [])
     } catch (e) {
-      setFehler('Daten konnten nicht geladen werden.')
+      setFehler('Daten konnten nicht geladen werden: ' + e.message)
     }
     setLaden(false)
   }
 
-  function formatDatum(d) {
-    if (!d) return '–'
-    const date = new Date(d)
-    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
-  }
+  // Tabelle: [id, pl, name, kurz, sp, sp_h, sp_a, sp_pkt, sp_pkt_h, sp_pkt_a, satz_gegen, ...]
+  // Index:    0   1   2     3     4   5      6     7        8          9          10
+  // MP = index 13, SP_plus = 7, SP_minus = 10
 
-  function formatUhrzeit(d) {
-    if (!d) return ''
-    const date = new Date(d)
-    return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr'
-  }
+  // Spiele: schauen wir uns an sobald Daten da
 
   return (
     <div>
@@ -83,41 +77,34 @@ export default function Liga() {
         {LIGEN.map((l, i) => (
           <button key={i}
             className={ligaIdx === i ? 'btn btn-primary' : 'btn btn-outline'}
-            style={{ fontSize: 14, padding: '12px 8px', fontWeight: 700 }}
+            style={{ fontSize: 13, padding: '12px 6px', fontWeight: 700 }}
             onClick={() => setLigaIdx(i)}>
             {l.label}
           </button>
         ))}
       </div>
 
-      {/* Ansicht wählen */}
+      {/* Ansicht */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
         <button className={ansicht === 'tabelle' ? 'btn btn-primary' : 'btn btn-outline'}
-          style={{ fontSize: 15, padding: '12px' }}
-          onClick={() => setAnsicht('tabelle')}>
+          style={{ fontSize: 15, padding: '12px' }} onClick={() => setAnsicht('tabelle')}>
           🏆 Tabelle
         </button>
         <button className={ansicht === 'spiele' ? 'btn btn-primary' : 'btn btn-outline'}
-          style={{ fontSize: 15, padding: '12px' }}
-          onClick={() => setAnsicht('spiele')}>
+          style={{ fontSize: 15, padding: '12px' }} onClick={() => setAnsicht('spiele')}>
           📋 Spiele
         </button>
       </div>
 
       {laden && <div className="loading">Lade Sportwinner-Daten…</div>}
-
-      {fehler && (
-        <div className="card" style={{ background: '#fde8e8', border: '2px solid #c0392b', color: '#c0392b', padding: 20, fontWeight: 700 }}>
-          ⚠️ {fehler}
-        </div>
-      )}
+      {fehler && <div className="card" style={{ color: '#c0392b', fontWeight: 700 }}>⚠️ {fehler}</div>}
 
       {/* TABELLE */}
       {!laden && !fehler && ansicht === 'tabelle' && (
         <div className="card">
           <div className="card-title">{liga.label} – Tabelle</div>
           {tabelle.length === 0 ? (
-            <div className="empty">Keine Tabellendaten verfügbar.</div>
+            <div className="empty">Keine Daten verfügbar.</div>
           ) : (
             <div className="table-wrap">
               <table>
@@ -126,31 +113,28 @@ export default function Liga() {
                     <th style={{ width: 36 }}>Pl.</th>
                     <th>Mannschaft</th>
                     <th className="zahl">Sp.</th>
-                    <th className="zahl">MP</th>
                     <th className="zahl">SP</th>
+                    <th className="zahl">MP</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tabelle.map((t, i) => {
-                    const tsv = istTSV(t.name || t.klub || t.mannschaft)
+                    const name = t[2] || '–'
+                    const tsv = istTSV(name)
+                    const pl = t[1]
+                    const sp = t[4]
+                    const spPlus = t[7]
+                    const spMinus = t[10]
+                    const mp = t[13]
                     return (
-                      <tr key={i} style={{
-                        background: tsv ? '#fff3cd' : '',
-                        fontWeight: tsv ? 700 : 400,
-                      }}>
-                        <td className="rang" style={{ fontSize: 16 }}>
-                          {t.pl || t.platz || i + 1}
+                      <tr key={i} style={{ background: tsv ? '#fff3cd' : '', fontWeight: tsv ? 700 : 400 }}>
+                        <td className="rang">{pl}</td>
+                        <td style={{ color: tsv ? '#7a5800' : 'inherit' }}>
+                          {tsv && '⭐ '}{name}
                         </td>
-                        <td>
-                          <span style={{ color: tsv ? '#7a5800' : 'inherit' }}>
-                            {tsv && '⭐ '}{t.name || t.klub || t.mannschaft || '–'}
-                          </span>
-                        </td>
-                        <td className="zahl">{t.sp || t.spiele || '–'}</td>
-                        <td className="zahl" style={{ fontWeight: 700, color: 'var(--blau)' }}>
-                          {t.mp || t.mannschaftspunkte || '–'}
-                        </td>
-                        <td className="zahl">{t.sp_diff || t.satzdifferenz || `${t.sp_plus || ''}:${t.sp_minus || ''}` || '–'}</td>
+                        <td className="zahl">{sp}</td>
+                        <td className="zahl">{spPlus} : {spMinus}</td>
+                        <td className="zahl" style={{ fontWeight: 700, color: 'var(--blau)' }}>{mp}</td>
                       </tr>
                     )
                   })}
@@ -158,8 +142,8 @@ export default function Liga() {
               </table>
             </div>
           )}
-          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--grau-text)', textAlign: 'right' }}>
-            Daten: bskv.sportwinner.de
+          <div style={{ marginTop: 10, fontSize: 12, color: 'var(--grau-text)', textAlign: 'right' }}>
+            Daten: bskv.sportwinner.de · SP = Satzpunkte · MP = Mannschaftspunkte
           </div>
         </div>
       )}
@@ -167,68 +151,65 @@ export default function Liga() {
       {/* SPIELE */}
       {!laden && !fehler && ansicht === 'spiele' && (
         <div className="card">
-          <div className="card-title">{liga.label} – Spielergebnisse</div>
+          <div className="card-title">{liga.label} – Spiele</div>
           {spiele.length === 0 ? (
             <div className="empty">Keine Spiele verfügbar.</div>
           ) : (
             <div>
               {spiele.map((s, i) => {
-                const heim    = s.klub1 || s.heim || s.heimmannschaft || ''
-                const gast    = s.klub2 || s.gast || s.gastmannschaft || ''
+                // Spiele-Array Struktur ermitteln
+                const isArr = Array.isArray(s)
+                const heim = isArr ? (s[3] || s[2] || '') : (s.klub1 || s.heim || '')
+                const gast = isArr ? (s[5] || s[4] || '') : (s.klub2 || s.gast || '')
+                const datum = isArr ? s[1] : s.datum
+                const ergebnis = isArr ? s[7] : s.ergebnis
                 const tsvHeim = istTSV(heim)
                 const tsvGast = istTSV(gast)
                 const beteiligt = tsvHeim || tsvGast
-                const gespielt = s.ergebnis || (s.sp1 !== undefined && s.sp2 !== undefined)
+                const gespielt = ergebnis && ergebnis !== '' && ergebnis !== '0:0'
+
+                function formatDatum(d) {
+                  if (!d) return ''
+                  const date = new Date(d)
+                  if (isNaN(date)) return d
+                  return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                }
 
                 return (
                   <div key={i} style={{
                     padding: '12px 0',
                     borderBottom: '1px solid var(--grau-mid)',
-                    background: beteiligt ? '#f0f8ff' : 'transparent',
-                    marginLeft: beteiligt ? -20 : 0,
-                    marginRight: beteiligt ? -20 : 0,
-                    paddingLeft: beteiligt ? 20 : 0,
-                    paddingRight: beteiligt ? 20 : 0,
+                    background: beteiligt ? '#fffbf0' : 'transparent',
                   }}>
-                    {/* Datum + Spieltag */}
                     <div style={{ fontSize: 12, color: 'var(--grau-text)', marginBottom: 4 }}>
-                      {s.datum ? formatDatum(s.datum) : ''}
-                      {s.datum && s.uhrzeit ? ' · ' : ''}
-                      {s.uhrzeit ? formatUhrzeit(s.datum + ' ' + s.uhrzeit) : ''}
-                      {s.spieltag ? ` · Spieltag ${s.spieltag}` : ''}
+                      {formatDatum(datum)}
                       {beteiligt && <span style={{ color: '#7a5800', fontWeight: 700, marginLeft: 8 }}>⭐ TSV</span>}
                     </div>
-
-                    {/* Heimteam vs Gastteam */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ flex: 1, fontWeight: tsvHeim ? 700 : 600, fontSize: 15, color: tsvHeim ? 'var(--blau)' : 'var(--text)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1, fontWeight: tsvHeim ? 700 : 600, fontSize: 14, color: tsvHeim ? 'var(--blau)' : 'var(--text)' }}>
                         {heim || '–'}
                       </div>
-
-                      {/* Ergebnis */}
                       <div style={{
-                        minWidth: 80, textAlign: 'center',
+                        minWidth: 70, textAlign: 'center',
                         background: gespielt ? 'var(--blau)' : 'var(--grau-mid)',
                         color: gespielt ? 'white' : 'var(--grau-text)',
-                        borderRadius: 8, padding: '4px 10px',
-                        fontWeight: 700, fontSize: gespielt ? 16 : 13,
+                        borderRadius: 8, padding: '4px 8px',
+                        fontWeight: 700, fontSize: 15,
                       }}>
-                        {gespielt
-                          ? (s.ergebnis || `${s.sp1}:${s.sp2}`)
-                          : (s.uhrzeit ? s.uhrzeit.slice(0, 5) : '–:–')
-                        }
+                        {gespielt ? ergebnis : '–:–'}
                       </div>
-
-                      <div style={{ flex: 1, fontWeight: tsvGast ? 700 : 600, fontSize: 15, textAlign: 'right', color: tsvGast ? 'var(--blau)' : 'var(--text)' }}>
+                      <div style={{ flex: 1, fontWeight: tsvGast ? 700 : 600, fontSize: 14, textAlign: 'right', color: tsvGast ? 'var(--blau)' : 'var(--text)' }}>
                         {gast || '–'}
                       </div>
                     </div>
+                    {/* Debug: erste Zeile anzeigen um Struktur zu sehen */}
+                    {i === 0 && <div style={{ fontSize: 10, color: '#aaa', marginTop: 4 }}>{JSON.stringify(s).slice(0, 150)}</div>}
                   </div>
                 )
               })}
             </div>
           )}
-          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--grau-text)', textAlign: 'right' }}>
+          <div style={{ marginTop: 10, fontSize: 12, color: 'var(--grau-text)', textAlign: 'right' }}>
             Daten: bskv.sportwinner.de
           </div>
         </div>
