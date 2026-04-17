@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { LIGEN, istTSV, callSportwinner, parseTabelleZeile } from './Liga'
 
 function getSaisonListe() {
   const heute = new Date()
@@ -25,6 +26,8 @@ export default function Startseite({ nav }) {
   const [naechsteTermine, setNaechsteTermine] = useState([])
   const [termineAufgeklappt, setTermineAufgeklappt] = useState(false)
   const [laden, setLaden]               = useState(true)
+
+  const [ligaPlätze, setLigaPlätze] = useState([])
 
   const saison = saisonListe[saisonIdx]
 
@@ -108,6 +111,16 @@ export default function Startseite({ nav }) {
       setNaechsteTermine(term || [])
 
       setLaden(false)
+
+      // Liga-Plätze laden
+      const plätze = await Promise.all(LIGEN.map(async (l) => {
+        const data = await callSportwinner('GetTabelle', { id_liga: l.id_liga, nr_spieltag: 100, sort: 0 })
+        if (!Array.isArray(data)) return { label: l.label, platz: null, von: null }
+        const tsvZeile = data.find(t => istTSV(t[2]))
+        const z = tsvZeile ? parseTabelleZeile(tsvZeile) : null
+        return { label: l.label, platz: z?.platz || null, von: data.length, mp: z?.mp || null }
+      }))
+      setLigaPlätze(plätze)
     }
     load()
   }, [saisonIdx])
@@ -182,6 +195,39 @@ export default function Startseite({ nav }) {
         onClick={() => nav('eintragen')}>
         🎳 Ergebnis eintragen
       </button>
+
+      {/* Liga Miniübersicht */}
+      {ligaPlätze.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16, cursor: 'pointer' }}
+          onClick={() => nav('liga')}>
+          {ligaPlätze.map((l, i) => (
+            <div key={i} style={{
+              background: 'var(--weiss)',
+              borderRadius: 'var(--radius)',
+              boxShadow: 'var(--shadow)',
+              padding: '14px 10px',
+              textAlign: 'center',
+              borderTop: `4px solid ${l.platz === 1 ? '#F5C400' : l.platz <= 3 ? '#1a7a3e' : 'var(--blau)'}`,
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 4 }}>
+                {l.label.split('–')[0].trim()}
+              </div>
+              {l.platz ? (
+                <>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--blau)', lineHeight: 1 }}>
+                    {l.platz === 1 ? '🥇' : l.platz === 2 ? '🥈' : l.platz === 3 ? '🥉' : `${l.platz}.`}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--grau-text)', marginTop: 2 }}>
+                    von {l.von} · {l.mp} MP
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--grau-text)' }}>–</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="start-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 

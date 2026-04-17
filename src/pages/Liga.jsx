@@ -2,32 +2,57 @@ import { useEffect, useState } from 'react'
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sportwinner`
 
-const LIGEN = [
+export const LIGEN = [
   { label: 'G1 – Kreisliga 1', id_liga: 4095 },
   { label: 'G2 – Kreisliga 2', id_liga: 4098 },
   { label: 'G3 – Kreisliga 3', id_liga: 4099 },
 ]
 
-const TSV_NAMEN = ['TSV Upf', 'Germering', 'TSV UG']
+const TSV_NAMEN = ['TSV Upf', 'Germering']
 
-function istTSV(name) {
+export function istTSV(name) {
   if (!name) return false
   return TSV_NAMEN.some(n => name.toLowerCase().includes(n.toLowerCase()))
 }
 
-async function callSportwinner(command, params = {}) {
+export async function callSportwinner(command, params = {}) {
   const body = { command, id_saison: '11', ...Object.fromEntries(Object.entries(params).map(([k,v]) => [k, String(v)])) }
   const res = await fetch(FUNCTION_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const json = await res.json()
-  // Edge function gibt { status, body } zurück
-  if (json.body) {
-    try { return JSON.parse(json.body) } catch { return null }
+  const text = await res.text()
+  try { return JSON.parse(text) } catch { return null }
+}
+
+// Tabelle: [id, platz, name, kurz, sp, sp_h, sp_a, sp_plus, sp_plus_h, sp_plus_a, sp_minus, sp_minus_h, sp_minus_a, mp, mp_h, mp_a, ...]
+export function parseTabelleZeile(t) {
+  return {
+    id:       t[0],
+    platz:    t[1],
+    name:     t[2],
+    sp:       t[4],
+    spPlus:   t[7],
+    spMinus:  t[10],
+    mp:       t[13],
   }
-  return json
+}
+
+// Spiele: [id, datum, uhrzeit, heim, ?, gast, ?, ergebnis_mp, ergebnis_sp, status, liga_name, spieltag]
+export function parseSpieleZeile(s) {
+  return {
+    id:       s[0],
+    datum:    s[1],
+    uhrzeit:  s[2],
+    heim:     s[3],
+    gast:     s[5],
+    mp:       s[7],
+    sp:       s[8],
+    status:   s[9],
+    liga:     s[10],
+    spieltag: s[11],
+  }
 }
 
 export default function Liga() {
@@ -59,16 +84,22 @@ export default function Liga() {
       setTabelle(Array.isArray(tabData) ? tabData : [])
       setSpiele(Array.isArray(spielData) ? spielData : [])
     } catch (e) {
-      setFehler('Daten konnten nicht geladen werden: ' + e.message)
+      setFehler('Daten konnten nicht geladen werden.')
     }
     setLaden(false)
   }
 
-  // Tabelle: [id, pl, name, kurz, sp, sp_h, sp_a, sp_pkt, sp_pkt_h, sp_pkt_a, satz_gegen, ...]
-  // Index:    0   1   2     3     4   5      6     7        8          9          10
-  // MP = index 13, SP_plus = 7, SP_minus = 10
+  function formatDatum(d) {
+    if (!d) return ''
+    const date = new Date(d)
+    if (isNaN(date)) return d
+    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  }
 
-  // Spiele: schauen wir uns an sobald Daten da
+  // Spiele nach Spieltag/Datum gruppieren und sortieren (neueste zuerst)
+  const spieleGesamt = spiele.map(parseSpieleZeile)
+  const gespielt = spieleGesamt.filter(s => s.status !== 'offen').sort((a,b) => new Date(b.datum) - new Date(a.datum))
+  const ausstehend = spieleGesamt.filter(s => s.status === 'offen').sort((a,b) => new Date(a.datum) - new Date(b.datum))
 
   return (
     <div>
@@ -119,22 +150,17 @@ export default function Liga() {
                 </thead>
                 <tbody>
                   {tabelle.map((t, i) => {
-                    const name = t[2] || '–'
-                    const tsv = istTSV(name)
-                    const pl = t[1]
-                    const sp = t[4]
-                    const spPlus = t[7]
-                    const spMinus = t[10]
-                    const mp = t[13]
+                    const z = parseTabelleZeile(t)
+                    const tsv = istTSV(z.name)
                     return (
                       <tr key={i} style={{ background: tsv ? '#fff3cd' : '', fontWeight: tsv ? 700 : 400 }}>
-                        <td className="rang">{pl}</td>
+                        <td className="rang">{z.platz}</td>
                         <td style={{ color: tsv ? '#7a5800' : 'inherit' }}>
-                          {tsv && '⭐ '}{name}
+                          {tsv && '⭐ '}{z.name}
                         </td>
-                        <td className="zahl">{sp}</td>
-                        <td className="zahl">{spPlus} : {spMinus}</td>
-                        <td className="zahl" style={{ fontWeight: 700, color: 'var(--blau)' }}>{mp}</td>
+                        <td className="zahl">{z.sp}</td>
+                        <td className="zahl">{z.spPlus} : {z.spMinus}</td>
+                        <td className="zahl" style={{ fontWeight: 700, color: 'var(--blau)' }}>{z.mp}</td>
                       </tr>
                     )
                   })}
@@ -150,68 +176,72 @@ export default function Liga() {
 
       {/* SPIELE */}
       {!laden && !fehler && ansicht === 'spiele' && (
-        <div className="card">
-          <div className="card-title">{liga.label} – Spiele</div>
-          {spiele.length === 0 ? (
-            <div className="empty">Keine Spiele verfügbar.</div>
-          ) : (
-            <div>
-              {spiele.map((s, i) => {
-                // Spiele-Array Struktur ermitteln
-                const isArr = Array.isArray(s)
-                const heim = isArr ? (s[3] || s[2] || '') : (s.klub1 || s.heim || '')
-                const gast = isArr ? (s[5] || s[4] || '') : (s.klub2 || s.gast || '')
-                const datum = isArr ? s[1] : s.datum
-                const ergebnis = isArr ? s[7] : s.ergebnis
-                const tsvHeim = istTSV(heim)
-                const tsvGast = istTSV(gast)
-                const beteiligt = tsvHeim || tsvGast
-                const gespielt = ergebnis && ergebnis !== '' && ergebnis !== '0:0'
-
-                function formatDatum(d) {
-                  if (!d) return ''
-                  const date = new Date(d)
-                  if (isNaN(date)) return d
-                  return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
-                }
-
-                return (
-                  <div key={i} style={{
-                    padding: '12px 0',
-                    borderBottom: '1px solid var(--grau-mid)',
-                    background: beteiligt ? '#fffbf0' : 'transparent',
-                  }}>
-                    <div style={{ fontSize: 12, color: 'var(--grau-text)', marginBottom: 4 }}>
-                      {formatDatum(datum)}
-                      {beteiligt && <span style={{ color: '#7a5800', fontWeight: 700, marginLeft: 8 }}>⭐ TSV</span>}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ flex: 1, fontWeight: tsvHeim ? 700 : 600, fontSize: 14, color: tsvHeim ? 'var(--blau)' : 'var(--text)' }}>
-                        {heim || '–'}
-                      </div>
-                      <div style={{
-                        minWidth: 70, textAlign: 'center',
-                        background: gespielt ? 'var(--blau)' : 'var(--grau-mid)',
-                        color: gespielt ? 'white' : 'var(--grau-text)',
-                        borderRadius: 8, padding: '4px 8px',
-                        fontWeight: 700, fontSize: 15,
-                      }}>
-                        {gespielt ? ergebnis : '–:–'}
-                      </div>
-                      <div style={{ flex: 1, fontWeight: tsvGast ? 700 : 600, fontSize: 14, textAlign: 'right', color: tsvGast ? 'var(--blau)' : 'var(--text)' }}>
-                        {gast || '–'}
-                      </div>
-                    </div>
-                    {/* Debug: erste Zeile anzeigen um Struktur zu sehen */}
-                    {i === 0 && <div style={{ fontSize: 10, color: '#aaa', marginTop: 4 }}>{JSON.stringify(s).slice(0, 150)}</div>}
-                  </div>
-                )
-              })}
+        <div>
+          {/* Ausstehende Spiele */}
+          {ausstehend.length > 0 && (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="card-title" style={{ fontSize: 16 }}>📅 Kommende Spiele</div>
+              {ausstehend.map((s, i) => <SpielZeile key={i} s={s} formatDatum={formatDatum} />)}
             </div>
           )}
-          <div style={{ marginTop: 10, fontSize: 12, color: 'var(--grau-text)', textAlign: 'right' }}>
+
+          {/* Gespielte Spiele */}
+          {gespielt.length > 0 && (
+            <div className="card">
+              <div className="card-title" style={{ fontSize: 16 }}>✅ Ergebnisse</div>
+              {gespielt.map((s, i) => <SpielZeile key={i} s={s} formatDatum={formatDatum} />)}
+            </div>
+          )}
+
+          {spieleGesamt.length === 0 && <div className="empty">Keine Spiele verfügbar.</div>}
+
+          <div style={{ fontSize: 12, color: 'var(--grau-text)', textAlign: 'right', marginTop: 8 }}>
             Daten: bskv.sportwinner.de
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SpielZeile({ s, formatDatum }) {
+  const tsvHeim = istTSV(s.heim)
+  const tsvGast = istTSV(s.gast)
+  const beteiligt = tsvHeim || tsvGast
+  const gespielt = s.status !== 'offen'
+
+  return (
+    <div style={{
+      padding: '12px 0',
+      borderBottom: '1px solid var(--grau-mid)',
+      background: beteiligt ? '#fffbf0' : 'transparent',
+    }}>
+      <div style={{ fontSize: 12, color: 'var(--grau-text)', marginBottom: 4, display: 'flex', gap: 8 }}>
+        <span>{formatDatum(s.datum)}</span>
+        {s.uhrzeit && s.uhrzeit !== '00:00' && <span>{s.uhrzeit} Uhr</span>}
+        {s.spieltag && <span>· Spieltag {s.spieltag}</span>}
+        {beteiligt && <span style={{ color: '#7a5800', fontWeight: 700 }}>⭐ TSV</span>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 1, fontWeight: tsvHeim ? 700 : 600, fontSize: 14, color: tsvHeim ? 'var(--blau)' : 'var(--text)' }}>
+          {s.heim || '–'}
+        </div>
+        <div style={{
+          minWidth: 80, textAlign: 'center',
+          background: gespielt ? 'var(--blau)' : 'var(--grau-mid)',
+          color: gespielt ? 'white' : 'var(--grau-text)',
+          borderRadius: 8, padding: '5px 10px',
+          fontWeight: 700, fontSize: gespielt ? 15 : 13,
+        }}>
+          {gespielt ? (s.mp || '–') : (s.uhrzeit && s.uhrzeit !== '00:00' ? s.uhrzeit : '–:–')}
+        </div>
+        <div style={{ flex: 1, fontWeight: tsvGast ? 700 : 600, fontSize: 14, textAlign: 'right', color: tsvGast ? 'var(--blau)' : 'var(--text)' }}>
+          {s.gast || '–'}
+        </div>
+      </div>
+      {gespielt && s.sp && (
+        <div style={{ fontSize: 12, color: 'var(--grau-text)', textAlign: 'center', marginTop: 3 }}>
+          SP: {s.sp}
         </div>
       )}
     </div>
