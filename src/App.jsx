@@ -5,12 +5,14 @@ import Startseite  from './pages/Startseite'
 import Eintragen   from './pages/Eintragen'
 import Statistiken from './pages/Statistiken'
 import Termine     from './pages/Termine'
+import Auswaerts   from './pages/Auswaerts'
 import Admin       from './pages/Admin'
 
 const SEITEN = [
   { key: 'start',       label: 'Start' },
   { key: 'termine',     label: 'Termine' },
   { key: 'statistiken', label: 'Statistiken' },
+  { key: 'auswaerts',   label: '✈️ Auswärts' },
   { key: 'eintragen',   label: '+ Ergebnis' },
   { key: 'admin',       label: 'Admin' },
 ]
@@ -28,7 +30,7 @@ export default function App() {
     <div>
       <header className="header">
         <div className="header-logo" onClick={() => navigiere('start')}>
-         <img src="/tsv-logo.svg" alt="TSV UG Logo" style={{ width: 48, height: 48 }} />
+          <img src="/tsv-logo.svg" alt="TSV UG Logo" style={{ width: 48, height: 48 }} />
           <div>
             <h1>TSV UG Kegeln</h1>
             <span>Unterpfaffenhofen-Germering e.V.</span>
@@ -64,6 +66,7 @@ export default function App() {
         {seite === 'start'       && <Startseite   nav={navigiere} />}
         {seite === 'termine'     && <Termine                      />}
         {seite === 'statistiken' && <Statistiken                  />}
+        {seite === 'auswaerts'   && <Auswaerts                    />}
         {seite === 'eintragen'   && <Eintragen    nav={navigiere} />}
         {seite === 'admin'       && <Admin                        />}
       </main>
