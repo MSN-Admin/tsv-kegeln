@@ -199,7 +199,7 @@ export default function Admin() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 20 }}>
+      <div className="grid-4 admin-tabs" style={{ marginBottom: 16 }}>
         {[
           { key: 'termine',    label: '📅 Termine' },
           { key: 'ergebnisse', label: '🎳 Ergebnisse' },

@@ -158,7 +158,7 @@ export default function Statistiken() {
       {vergleichIds.length >= 2 && (
         <div className="card">
           <div className="card-title">Vergleich – {saison.label}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${vergleichIds.length}, 1fr)`, gap: 12, marginBottom: 20 }}>
+          <div className="vergleich-cards" style={{ display: 'grid', gridTemplateColumns: `repeat(${vergleichIds.length}, minmax(200px, 1fr))`, gap: 12, marginBottom: 20 }}>
             {vergleichIds.map((id, idx) => {
               const vd = vergleichDaten[id]
               if (!vd) return null

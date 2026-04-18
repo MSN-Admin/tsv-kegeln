@@ -269,9 +269,9 @@ function SpielZeile({ s, formatDatum }) {
 
       {/* Detail-Tabelle */}
       {offen && gespielt && (
-        <div style={{ paddingBottom: 12, overflowX: 'auto' }}>
+        <div className="spiel-detail-wrap">
           {ladenDet ? (
-            <div style={{ fontSize: 13, color: 'var(--grau-text)', padding: '8px 0' }}>Lade Details…</div>
+            <div style={{ fontSize: 14, color: 'var(--grau-text)', padding: '8px 0' }}>Lade Details…</div>
           ) : details ? (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
               <thead>

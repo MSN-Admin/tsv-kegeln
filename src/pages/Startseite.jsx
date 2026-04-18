@@ -261,7 +261,7 @@ export default function Startseite({ nav }) {
         </div>
       )}
 
-      <div className="start-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="start-grid grid-2" style={{ gap: 14 }}>
 
         {/* Rangliste */}
         <div className="card">
