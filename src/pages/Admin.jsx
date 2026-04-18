@@ -366,8 +366,8 @@ export default function Admin() {
                         </span>
                       </td>
                       <td style={{ fontSize: 13 }}>{fD(m.eintrittsdatum)}</td>
-                      <td style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                        <button onClick={() => pinAendern(m)} style={{ background: 'none', border: 'none', color: '#003D8F', cursor: 'pointer', fontSize: 13 }}>PIN</button>
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button onClick={() => pinAendern(m)} style={{ background: 'none', border: 'none', color: '#003D8F', cursor: 'pointer', fontSize: 13, marginRight: 10 }}>PIN</button>
                         <button onClick={() => toggleAktiv(m)} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 13 }}>{m.aktiv ? 'deakt.' : 'aktiv.'}</button>
                       </td>
                     </tr>
