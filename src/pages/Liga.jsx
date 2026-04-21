@@ -39,11 +39,27 @@ export function parseTabelleZeile(t) {
   }
 }
 
+// Hilfsfunktion: deutsches Datum "22.04.2026" → ISO "2026-04-22"
+export function deToIso(d) {
+  if (!d) return ''
+  if (d.includes('-')) return d // schon ISO
+  const [tag, monat, jahr] = d.split('.')
+  if (!tag || !monat || !jahr) return d
+  return `${jahr}-${monat.padStart(2,'0')}-${tag.padStart(2,'0')}`
+}
+
+// Spieltag-String kürzen: "Spieltag Männer / Kreisliga 2 / 18. Spieltag" → "18. Spieltag"
+function kuerzeSpieltag(s) {
+  if (!s) return ''
+  const match = s.match(/(\d+\.\s*Spieltag)/i)
+  return match ? match[1] : s
+}
+
 // Spiele: [id, datum, uhrzeit, heim, ?, gast, ?, ergebnis_mp, ergebnis_sp, status, liga_name, spieltag]
 export function parseSpieleZeile(s) {
   return {
     id:       s[0],
-    datum:    s[1],
+    datum:    deToIso(s[1]),
     uhrzeit:  s[2],
     heim:     s[3],
     gast:     s[5],
@@ -51,7 +67,7 @@ export function parseSpieleZeile(s) {
     sp:       s[8],
     status:   s[9],
     liga:     s[10],
-    spieltag: s[11],
+    spieltag: kuerzeSpieltag(s[11]),
   }
 }
 
@@ -96,10 +112,14 @@ export default function Liga() {
     return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
   }
 
+  function istOffen(s) {
+    return s.status === 'offen' || s.status === '0' || s.status === '' || !s.status
+  }
+
   // Alle Spiele – nach Datum sortiert
   const spieleGesamt = spiele.map(parseSpieleZeile)
-  const gespielt   = spieleGesamt.filter(s => s.status !== 'offen').sort((a,b) => new Date(b.datum) - new Date(a.datum))
-  const ausstehend = spieleGesamt.filter(s => s.status === 'offen').sort((a,b) => new Date(a.datum) - new Date(b.datum))
+  const gespielt   = spieleGesamt.filter(s => !istOffen(s)).sort((a,b) => new Date(b.datum) - new Date(a.datum))
+  const ausstehend = spieleGesamt.filter(s => istOffen(s)).sort((a,b) => new Date(a.datum) - new Date(b.datum))
 
   // Spieltag-Gruppen für gespielte Spiele
   function gruppiereNachSpieltag(spiele) {
@@ -201,16 +221,23 @@ export default function Liga() {
           {/* Ergebnisse nach Spieltag gruppiert */}
           {gespieltGruppiert.map((gruppe, gi) => (
             <div key={gi} className="card" style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 12, letterSpacing: 0.5 }}>
-                {gruppe.spieltag ? `Spieltag ${gruppe.spieltag}` : formatDatum(gruppe.datum)}
-                {gruppe.datum && <span style={{ marginLeft: 8, fontWeight: 400 }}>· {formatDatum(gruppe.datum)}</span>}
+              <div style={{
+                fontSize: 14, fontWeight: 700, color: 'var(--blau)',
+                marginBottom: 12, paddingBottom: 8,
+                borderBottom: '2px solid var(--gelb)',
+              }}>
+                {gruppe.spieltag || formatDatum(gruppe.datum)}
+                {gruppe.datum && gruppe.spieltag && (
+                  <span style={{ fontWeight: 400, color: 'var(--grau-text)', marginLeft: 8, fontSize: 13 }}>
+                    · {formatDatum(gruppe.datum)}
+                  </span>
+                )}
               </div>
               {gruppe.spiele.map((s, i) => <SpielZeile key={i} s={s} formatDatum={formatDatum} />)}
             </div>
           ))}
 
           {spieleGesamt.length === 0 && <div className="empty">Keine Spiele verfügbar.</div>}
-
           <div style={{ fontSize: 12, color: 'var(--grau-text)', textAlign: 'right', marginTop: 8 }}>
             Daten: bskv.sportwinner.de
           </div>
@@ -270,7 +297,10 @@ function SpielZeile({ s, formatDatum }) {
             borderRadius: 8, padding: '5px 10px',
             fontWeight: 700, fontSize: gespielt ? 15 : 13,
           }}>
-            {gespielt ? (s.mp || '–') : (s.uhrzeit && s.uhrzeit !== '00:00' ? s.uhrzeit : '–:–')}
+            {gespielt
+              ? <span title="Mannschaftspunkte">{s.mp || '–'} MP</span>
+              : (s.uhrzeit && s.uhrzeit !== '00:00' ? s.uhrzeit : '–:–')
+            }
           </div>
           <div style={{ flex: 1, fontWeight: tsvGast ? 700 : 600, fontSize: 14, textAlign: 'right', color: tsvGast ? 'var(--blau)' : 'var(--text)' }}>
             {s.gast || '–'}
@@ -278,7 +308,7 @@ function SpielZeile({ s, formatDatum }) {
         </div>
         {gespielt && s.sp && (
           <div style={{ fontSize: 12, color: 'var(--grau-text)', textAlign: 'center', marginTop: 3 }}>
-            SP: {s.sp}
+            Satzpunkte: {s.sp}
           </div>
         )}
       </div>

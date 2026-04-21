@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { LIGEN, istTSV, callSportwinner, parseTabelleZeile, parseSpieleZeile } from './Liga'
+import { LIGEN, istTSV, callSportwinner, parseTabelleZeile, parseSpieleZeile, deToIso } from './Liga'
 
 function getSaisonListe() {
   const heute = new Date()
@@ -128,13 +128,23 @@ export default function Startseite({ nav }) {
           }),
         ])
 
-        // Tabelle als Map für Platz-Lookup
+        // Tabelle als Map für Platz-Lookup (normalisiert)
         const tabelleMap = {}
         if (Array.isArray(tabData)) {
           tabData.forEach(t => {
             const z = parseTabelleZeile(t)
-            tabelleMap[z.name] = z.platz
+            // Normalisierter Key: Kleinbuchstaben, Leerzeichen vereinfacht
+            tabelleMap[z.name.toLowerCase().trim()] = z.platz
           })
+        }
+
+        function findeGegnerPlatz(name) {
+          if (!name) return null
+          const key = name.toLowerCase().trim()
+          if (tabelleMap[key]) return tabelleMap[key]
+          // Fuzzy: erster Match der den Namen enthält
+          const found = Object.keys(tabelleMap).find(k => k.includes(key) || key.includes(k))
+          return found ? tabelleMap[found] : null
         }
 
         const tsvZeile = Array.isArray(tabData) ? tabData.find(t => istTSV(t[2])) : null
@@ -144,13 +154,16 @@ export default function Startseite({ nav }) {
           const heute2 = new Date().toISOString().slice(0, 10)
           const tsvSpiele = spielData
             .map(parseSpieleZeile)
-            .filter(s => s.status === 'offen' && (istTSV(s.heim) || istTSV(s.gast)) && s.datum >= heute2)
+            .filter(s => {
+              const istOffen = s.status === 'offen' || s.status === '0' || s.status === '' || !s.status
+              return istOffen && (istTSV(s.heim) || istTSV(s.gast)) && s.datum >= heute2
+            })
             .sort((a,b) => new Date(a.datum) - new Date(b.datum))
             .slice(0, 2)
           tsvSpiele.forEach(s => {
             const heim = istTSV(s.heim)
             const gegner = heim ? s.gast : s.heim
-            const gegnerPlatz = tabelleMap[gegner] || null
+            const gegnerPlatz = findeGegnerPlatz(gegner)
             alleSpiele.push({
               ...s,
               ligaLabel: l.label.split('–')[0].trim(),
