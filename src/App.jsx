@@ -11,7 +11,7 @@ import Admin       from './pages/Admin'
 
 const SEITEN = [
   { key: 'start',       label: '🏠 Start' },
-  { key: 'termine',     label: '📅 Wichtige Termine' },
+  { key: 'termine',     label: '📅 Interne Termine' },
   { key: 'liga',        label: '🏆 Liga' },
   { key: 'statistiken', label: '📊 Statistiken' },
   { key: 'auswaerts',   label: '✈️ Auswärts' },
