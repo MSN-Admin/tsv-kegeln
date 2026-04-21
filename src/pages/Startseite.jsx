@@ -214,15 +214,20 @@ export default function Startseite({ nav }) {
         <div className="card" style={{ borderLeft: '5px solid var(--gelb)' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 6, letterSpacing: 1 }}>NÄCHSTER TERMIN</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--blau)', marginBottom: 4 }}>{ersterTermin.titel}</div>
-          <div style={{ fontSize: 14, color: 'var(--grau-text)', display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: weitereTermine.length > 0 ? 10 : 0 }}>
+          <div style={{ fontSize: 14, color: 'var(--grau-text)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <span>📅 {formatDatumLang(ersterTermin.datum)}</span>
             {ersterTermin.uhrzeit && <span>🕐 {ersterTermin.uhrzeit.slice(0,5)} Uhr</span>}
             {ersterTermin.ort && <span>📍 {ersterTermin.ort}</span>}
           </div>
+          {ersterTermin.beschreibung && (
+            <div style={{ fontSize: 14, color: 'var(--grau-text)', marginTop: 6, fontStyle: 'italic' }}>
+              {ersterTermin.beschreibung}
+            </div>
+          )}
           {weitereTermine.length > 0 && (
             <>
               <button onClick={() => setTermineAufgeklappt(o => !o)}
-                style={{ background: 'none', border: 'none', color: 'var(--blau)', fontSize: 14, fontWeight: 700, cursor: 'pointer', padding: 0 }}>
+                style={{ background: 'none', border: 'none', color: 'var(--blau)', fontSize: 14, fontWeight: 700, cursor: 'pointer', padding: 0, marginTop: 10 }}>
                 {termineAufgeklappt ? '▲ Weniger' : `▼ ${weitereTermine.length} weitere Termine`}
               </button>
               {termineAufgeklappt && (
@@ -235,6 +240,11 @@ export default function Startseite({ nav }) {
                         {t.uhrzeit && <span>🕐 {t.uhrzeit.slice(0,5)} Uhr</span>}
                         {t.ort && <span>📍 {t.ort}</span>}
                       </div>
+                      {t.beschreibung && (
+                        <div style={{ fontSize: 13, color: 'var(--grau-text)', marginTop: 3, fontStyle: 'italic' }}>
+                          {t.beschreibung}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
