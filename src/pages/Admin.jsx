@@ -26,6 +26,8 @@ export default function Admin() {
   const [tBeschreibung, setTBeschreibung]   = useState('')
   const [tArt, setTArt]                     = useState('sonstiges')
   const [tMeldung, setTMeldung]             = useState('')
+  const [tBearbeite, setTBearbeite]         = useState(null) // id des zu bearbeitenden Termins
+  const [tEditWerte, setTEditWerte]         = useState({})
 
   // Ergebnisse
   const [ergebnisse, setErgebnisse] = useState([])
@@ -119,6 +121,33 @@ export default function Admin() {
     if (!confirm('Termin löschen?')) return
     await supabase.from('termine').delete().eq('id', id)
     ladeAlles()
+  }
+
+  function terminBearbeitenStart(t) {
+    setTBearbeite(t.id)
+    setTEditWerte({
+      titel: t.titel, datum: t.datum,
+      uhrzeit: t.uhrzeit || '', ort: t.ort || '',
+      beschreibung: t.beschreibung || '', art: t.art,
+    })
+    setTMeldung('')
+  }
+
+  async function terminSpeichern() {
+    setTMeldung('')
+    const { error } = await supabase.from('termine').update({
+      titel: tEditWerte.titel,
+      datum: tEditWerte.datum,
+      uhrzeit: tEditWerte.uhrzeit || null,
+      ort: tEditWerte.ort || null,
+      beschreibung: tEditWerte.beschreibung || null,
+      art: tEditWerte.art,
+    }).eq('id', tBearbeite)
+    if (error) { setTMeldung('Fehler: ' + error.message); return }
+    setTMeldung('✓ Termin gespeichert!')
+    setTBearbeite(null)
+    await ladeAlles()
+    setTimeout(() => setTMeldung(''), 3000)
   }
 
   // Ergebnisse
@@ -247,27 +276,78 @@ export default function Admin() {
               <div className="form-group"><label>Ort</label><input type="text" value={tOrt} onChange={e => setTOrt(e.target.value)} /></div>
             </div>
             <div className="form-group"><label>Beschreibung</label><input type="text" value={tBeschreibung} onChange={e => setTBeschreibung(e.target.value)} /></div>
-            {tMeldung && <p style={{ color: tMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)', fontSize: 14, marginBottom: 12 }}>{tMeldung}</p>}
             <button className="btn btn-gelb btn-voll" onClick={terminAnlegen} disabled={!tTitel || !tDatum}>Termin anlegen</button>
           </div>
           <div className="card">
             <div className="card-title">Alle Termine ({termine.length})</div>
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Datum</th><th>Zeit</th><th>Titel</th><th>Art</th><th>Ort</th><th></th></tr></thead>
-                <tbody>
-                  {termine.map((t, i) => (
-                    <tr key={i}>
-                      <td>{fD(t.datum)}</td><td>{fU(t.uhrzeit)}</td>
-                      <td style={{ fontWeight: 600 }}>{t.titel}</td>
-                      <td><span className={`badge badge-${t.art}`}>{t.art}</span></td>
-                      <td style={{ color: 'var(--grau-text)' }}>{t.ort || '–'}</td>
-                      <td><button onClick={() => terminLoeschen(t.id)} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer' }}>löschen</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {tMeldung && (
+              <div style={{ background: tMeldung.startsWith('Fehler') ? '#fde8e8' : '#d4edda', border: `2px solid ${tMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontWeight: 700, color: tMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)' }}>
+                {tMeldung}
+              </div>
+            )}
+            {termine.length === 0 ? <div className="empty">Noch keine Termine.</div> : (
+              termine.map((t, i) => (
+                <div key={i} style={{
+                  border: `2px solid ${tBearbeite === t.id ? 'var(--blau)' : 'var(--grau-mid)'}`,
+                  borderRadius: 10, padding: 14, marginBottom: 10,
+                  background: tBearbeite === t.id ? '#f0f4ff' : 'var(--grau-hell)'
+                }}>
+                  {tBearbeite === t.id ? (
+                    // ── Bearbeitungsformular ──
+                    <div>
+                      <div className="form-group">
+                        <label>Titel</label>
+                        <input type="text" value={tEditWerte.titel} onChange={e => setTEditWerte(p => ({ ...p, titel: e.target.value }))} />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div className="form-group"><label>Datum</label><input type="date" value={tEditWerte.datum} onChange={e => setTEditWerte(p => ({ ...p, datum: e.target.value }))} /></div>
+                        <div className="form-group"><label>Uhrzeit</label><input type="time" value={tEditWerte.uhrzeit} onChange={e => setTEditWerte(p => ({ ...p, uhrzeit: e.target.value }))} /></div>
+                        <div className="form-group">
+                          <label>Art</label>
+                          <select value={tEditWerte.art} onChange={e => setTEditWerte(p => ({ ...p, art: e.target.value }))}>
+                            <option value="training">Training</option>
+                            <option value="wettkampf">Wettkampf</option>
+                            <option value="ausflug">Ausflug</option>
+                            <option value="sitzung">Sitzung</option>
+                            <option value="sonstiges">Sonstiges</option>
+                          </select>
+                        </div>
+                        <div className="form-group"><label>Ort</label><input type="text" value={tEditWerte.ort} onChange={e => setTEditWerte(p => ({ ...p, ort: e.target.value }))} /></div>
+                      </div>
+                      <div className="form-group"><label>Beschreibung</label><input type="text" value={tEditWerte.beschreibung} onChange={e => setTEditWerte(p => ({ ...p, beschreibung: e.target.value }))} /></div>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button className="btn btn-gruen" style={{ flex: 1 }} onClick={terminSpeichern}>✓ Speichern</button>
+                        <button className="btn btn-outline" onClick={() => setTBearbeite(null)}>Abbrechen</button>
+                      </div>
+                    </div>
+                  ) : (
+                    // ── Ansicht ──
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 3 }}>{t.titel}</div>
+                        <div style={{ fontSize: 13, color: 'var(--grau-text)', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          <span>📅 {fD(t.datum)}</span>
+                          {t.uhrzeit && <span>🕐 {fU(t.uhrzeit)}</span>}
+                          {t.ort && <span>📍 {t.ort}</span>}
+                          <span className={`badge badge-${t.art}`} style={{ fontSize: 11 }}>{t.art}</span>
+                        </div>
+                        {t.beschreibung && <div style={{ fontSize: 13, color: 'var(--grau-text)', marginTop: 4 }}>{t.beschreibung}</div>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                        <button onClick={() => terminBearbeitenStart(t)}
+                          style={{ background: 'none', border: '2px solid var(--blau)', color: 'var(--blau)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                          ✏️
+                        </button>
+                        <button onClick={() => terminLoeschen(t.id)}
+                          style={{ background: 'none', border: '2px solid #c0392b', color: '#c0392b', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
