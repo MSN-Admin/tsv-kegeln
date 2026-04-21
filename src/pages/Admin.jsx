@@ -84,6 +84,11 @@ export default function Admin() {
     ladeAlles()
   }
 
+  async function toggleKapit(m) {
+    await supabase.from('mitglieder').update({ mannschaftsfuehrer: !m.mannschaftsfuehrer }).eq('id', m.id)
+    ladeAlles()
+  }
+
   async function toggleAktiv(m) {
     await supabase.from('mitglieder').update({ aktiv: !m.aktiv }).eq('id', m.id)
     ladeAlles()
@@ -357,11 +362,14 @@ export default function Admin() {
             <div className="card-title">Alle Mitglieder ({mitglieder.length})</div>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Name</th><th>Mannschaft</th><th>Status</th><th>Eintritt</th><th></th></tr></thead>
+                <thead><tr><th>Name</th><th>Mannschaft</th><th>Kapt.</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                   {mitglieder.map((m, i) => (
                     <tr key={i}>
-                      <td style={{ fontWeight: 600 }}>{m.name}</td>
+                      <td style={{ fontWeight: 600 }}>
+                        {m.mannschaftsfuehrer && <span title="Mannschaftsführer*in" style={{ marginRight: 4 }}>🏅</span>}
+                        {m.name}
+                      </td>
                       <td>
                         <select value={m.mannschaft || ''} onChange={e => mannschaftAendern(m, e.target.value)}
                           style={{ fontSize: 14, border: '1px solid var(--grau-mid)', borderRadius: 6, padding: '4px 8px' }}>
@@ -371,12 +379,19 @@ export default function Admin() {
                           <option value="3">G3</option>
                         </select>
                       </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          onClick={() => toggleKapit(m)}
+                          title={m.mannschaftsfuehrer ? 'Kapitänsbinde entfernen' : 'Zum/zur Mannschaftsführer*in machen'}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20 }}>
+                          {m.mannschaftsfuehrer ? '🏅' : '○'}
+                        </button>
+                      </td>
                       <td>
                         <span className="badge" style={{ background: m.aktiv ? '#d4edda' : '#f8d7da', color: m.aktiv ? '#155724' : '#721c24' }}>
                           {m.aktiv ? 'aktiv' : 'inaktiv'}
                         </span>
                       </td>
-                      <td style={{ fontSize: 13 }}>{fD(m.eintrittsdatum)}</td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <button onClick={() => pinAendern(m)} style={{ background: 'none', border: 'none', color: '#003D8F', cursor: 'pointer', fontSize: 13, marginRight: 10 }}>PIN</button>
                         <button onClick={() => toggleAktiv(m)} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 13 }}>{m.aktiv ? 'deakt.' : 'aktiv.'}</button>

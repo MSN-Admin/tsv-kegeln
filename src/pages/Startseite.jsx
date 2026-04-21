@@ -175,6 +175,7 @@ export default function Startseite({ nav }) {
         }
 
         return { label: l.label, id_liga: l.id_liga, platz: z?.platz || null, von: Array.isArray(tabData) ? tabData.length : null, mp: z?.mp || null }
+      }))
       setLigaPlätze(plätze)
       setNaechsteSpiele(alleSpiele.sort((a,b) => new Date(a.datum) - new Date(b.datum)))
     }

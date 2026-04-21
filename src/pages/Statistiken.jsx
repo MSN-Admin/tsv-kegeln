@@ -26,7 +26,7 @@ export default function Statistiken() {
   const saison = saisonListe[saisonIdx]
 
   useEffect(() => {
-    supabase.from('mitglieder').select('id, name, mannschaft').eq('aktiv', true).order('name')
+    supabase.from('mitglieder').select('id, name, mannschaft, mannschaftsfuehrer').eq('aktiv', true).order('name')
       .then(({ data }) => { setMitglieder(data || []); setLaden(false) })
   }, [])
 
@@ -143,7 +143,10 @@ export default function Statistiken() {
                   }}>
                     {aktiv ? idx + 1 : ''}
                   </div>
-                  <div style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>{m.name}</div>
+                  <div style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>
+                    {m.name}
+                    {m.mannschaftsfuehrer && <span style={{ marginLeft: 6, fontSize: 14 }}>🏅</span>}
+                  </div>
                   <div style={{ fontSize: 20, color: aktiv ? FARBEN[idx] : 'var(--grau-mid)' }}>
                     {aktiv ? '✓' : '+'}
                   </div>
@@ -223,7 +226,12 @@ export default function Statistiken() {
               <div key={i} className="mitglied-karte" onClick={() => waehle(m)}>
                 <div className="mitglied-avatar">{m.name.charAt(0).toUpperCase()}</div>
                 <div style={{ flex: 1 }}>
-                  <div className="mitglied-name">{m.name}</div>
+                  <div className="mitglied-name">
+                    {m.name}
+                    {m.mannschaftsfuehrer && (
+                      <span title="Mannschaftsführer*in" style={{ marginLeft: 6, fontSize: 16 }}>🏅</span>
+                    )}
+                  </div>
                 </div>
                 <div style={{ color: 'var(--blau)', fontSize: 22 }}>›</div>
               </div>
@@ -274,7 +282,12 @@ export default function Statistiken() {
             {ausgewaehlt.name.charAt(0).toUpperCase()}
           </div>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{ausgewaehlt.name}</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>
+              {ausgewaehlt.name}
+              {ausgewaehlt.mannschaftsfuehrer && (
+                <span title="Mannschaftsführer*in" style={{ marginLeft: 8, fontSize: 18 }}>🏅</span>
+              )}
+            </div>
             {ausgewaehlt.mannschaft && (
               <div style={{ fontSize: 14, color: 'var(--grau-text)' }}>{ausgewaehlt.mannschaft}. Mannschaft</div>
             )}
