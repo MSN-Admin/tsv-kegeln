@@ -119,12 +119,19 @@ export default function Admin() {
   // Ergebnisse
   function startBearbeiten(e) {
     setBearbeite(e.id)
-    setEditWerte({ volle_punkte: e.volle_punkte, volle_fehler: e.volle_fehler, abraeumen_punkte: e.abraeumen_punkte, abraeumen_fehler: e.abraeumen_fehler })
+    setEditWerte({
+      volle_punkte: e.volle_punkte,
+      volle_fehler: e.volle_fehler,
+      abraeumen_punkte: e.abraeumen_punkte,
+      abraeumen_fehler: e.abraeumen_fehler,
+      datum: e.datum,
+    })
     setErgMeldung('')
   }
 
   async function ergebnisSpeichern(id) {
     const { error } = await supabase.from('ergebnisse').update({
+      datum: editWerte.datum,
       volle_punkte: parseInt(editWerte.volle_punkte),
       volle_fehler: parseInt(editWerte.volle_fehler) || 0,
       abraeumen_punkte: parseInt(editWerte.abraeumen_punkte),
@@ -292,6 +299,10 @@ export default function Admin() {
               </div>
               {bearbeite === e.id ? (
                 <div>
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 4 }}>DATUM</div>
+                    <input type="date" style={{ ...editInput, textAlign: 'left', fontWeight: 400, width: '100%' }} value={editWerte.datum || e.datum} onChange={ev => setEditWerte(p => ({ ...p, datum: ev.target.value }))} />
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
                     {[['volle_punkte','VOLLE PKT'],['volle_fehler','VOLLE FEHL'],['abraeumen_punkte','ABR. PKT'],['abraeumen_fehler','ABR. FEHL']].map(([k, l]) => (
                       <div key={k}>

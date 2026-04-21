@@ -96,10 +96,23 @@ export default function Liga() {
     return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
   }
 
-  // Spiele nach Spieltag/Datum gruppieren und sortieren (neueste zuerst)
+  // Alle Spiele – nach Datum sortiert
   const spieleGesamt = spiele.map(parseSpieleZeile)
-  const gespielt = spieleGesamt.filter(s => s.status !== 'offen').sort((a,b) => new Date(b.datum) - new Date(a.datum))
+  const gespielt   = spieleGesamt.filter(s => s.status !== 'offen').sort((a,b) => new Date(b.datum) - new Date(a.datum))
   const ausstehend = spieleGesamt.filter(s => s.status === 'offen').sort((a,b) => new Date(a.datum) - new Date(b.datum))
+
+  // Spieltag-Gruppen für gespielte Spiele
+  function gruppiereNachSpieltag(spiele) {
+    const map = {}
+    for (const s of spiele) {
+      const key = s.spieltag || s.datum
+      if (!map[key]) map[key] = { spieltag: s.spieltag, datum: s.datum, spiele: [] }
+      map[key].spiele.push(s)
+    }
+    return Object.values(map).sort((a,b) => new Date(b.datum) - new Date(a.datum))
+  }
+
+  const gespieltGruppiert = gruppiereNachSpieltag(gespielt)
 
   return (
     <div>
@@ -177,7 +190,7 @@ export default function Liga() {
       {/* SPIELE */}
       {!laden && !fehler && ansicht === 'spiele' && (
         <div>
-          {/* Ausstehende Spiele */}
+          {/* Kommende Spiele */}
           {ausstehend.length > 0 && (
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-title" style={{ fontSize: 16 }}>📅 Kommende Spiele</div>
@@ -185,13 +198,16 @@ export default function Liga() {
             </div>
           )}
 
-          {/* Gespielte Spiele */}
-          {gespielt.length > 0 && (
-            <div className="card">
-              <div className="card-title" style={{ fontSize: 16 }}>✅ Ergebnisse</div>
-              {gespielt.map((s, i) => <SpielZeile key={i} s={s} formatDatum={formatDatum} />)}
+          {/* Ergebnisse nach Spieltag gruppiert */}
+          {gespieltGruppiert.map((gruppe, gi) => (
+            <div key={gi} className="card" style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 12, letterSpacing: 0.5 }}>
+                {gruppe.spieltag ? `Spieltag ${gruppe.spieltag}` : formatDatum(gruppe.datum)}
+                {gruppe.datum && <span style={{ marginLeft: 8, fontWeight: 400 }}>· {formatDatum(gruppe.datum)}</span>}
+              </div>
+              {gruppe.spiele.map((s, i) => <SpielZeile key={i} s={s} formatDatum={formatDatum} />)}
             </div>
-          )}
+          ))}
 
           {spieleGesamt.length === 0 && <div className="empty">Keine Spiele verfügbar.</div>}
 

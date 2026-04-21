@@ -127,6 +127,16 @@ export default function Startseite({ nav }) {
             art_kreis: 1, art_liga: 0, art_spieltag: 0
           }),
         ])
+
+        // Tabelle als Map für Platz-Lookup
+        const tabelleMap = {}
+        if (Array.isArray(tabData)) {
+          tabData.forEach(t => {
+            const z = parseTabelleZeile(t)
+            tabelleMap[z.name] = z.platz
+          })
+        }
+
         const tsvZeile = Array.isArray(tabData) ? tabData.find(t => istTSV(t[2])) : null
         const z = tsvZeile ? parseTabelleZeile(tsvZeile) : null
 
@@ -137,7 +147,18 @@ export default function Startseite({ nav }) {
             .filter(s => s.status === 'offen' && (istTSV(s.heim) || istTSV(s.gast)) && s.datum >= heute2)
             .sort((a,b) => new Date(a.datum) - new Date(b.datum))
             .slice(0, 2)
-          tsvSpiele.forEach(s => alleSpiele.push({ ...s, ligaLabel: l.label.split('–')[0].trim() }))
+          tsvSpiele.forEach(s => {
+            const heim = istTSV(s.heim)
+            const gegner = heim ? s.gast : s.heim
+            const gegnerPlatz = tabelleMap[gegner] || null
+            alleSpiele.push({
+              ...s,
+              ligaLabel: l.label.split('–')[0].trim(),
+              istHeim: heim,
+              gegner,
+              gegnerPlatz,
+            })
+          })
         }
 
         return { label: l.label, id_liga: l.id_liga, platz: z?.platz || null, von: Array.isArray(tabData) ? tabData.length : null, mp: z?.mp || null }
@@ -231,33 +252,53 @@ export default function Startseite({ nav }) {
         </div>
       )}
 
-      {/* Nächste Spiele aller Mannschaften */}
+      {/* Nächste Spiele aller Mannschaften – 3-spaltig */}
       {naechsteSpiele.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-title" style={{ fontSize: 16 }}>📅 Nächste Spiele</div>
-          {naechsteSpiele.map((s, i) => {
-            const tsvHeim = istTSV(s.heim)
-            return (
-              <div key={i} style={{ padding: '10px 0', borderBottom: i < naechsteSpiele.length-1 ? '1px solid var(--grau-mid)' : 'none' }}>
-                <div style={{ fontSize: 12, color: 'var(--grau-text)', marginBottom: 3, display: 'flex', gap: 8 }}>
-                  <span style={{ fontWeight: 700, color: 'var(--blau)' }}>{s.ligaLabel}</span>
-                  <span>{formatDatumKurz(s.datum)}</span>
-                  {s.uhrzeit && s.uhrzeit !== '00:00' && <span>{s.uhrzeit} Uhr</span>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {naechsteSpiele.map((s, i) => (
+              <div key={i} style={{
+                background: 'var(--grau-hell)', borderRadius: 10,
+                padding: '12px 10px', textAlign: 'center',
+                border: '2px solid var(--blau)',
+              }}>
+                {/* Liga */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blau)', marginBottom: 6, letterSpacing: 0.5 }}>
+                  {s.ligaLabel}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ flex: 1, fontWeight: tsvHeim ? 700 : 400, fontSize: 14, color: tsvHeim ? 'var(--blau)' : 'var(--text)' }}>
-                    {s.heim}
-                  </div>
-                  <div style={{ background: 'var(--grau-mid)', borderRadius: 6, padding: '3px 10px', fontSize: 13, color: 'var(--grau-text)', fontWeight: 700 }}>
-                    vs.
-                  </div>
-                  <div style={{ flex: 1, fontWeight: !tsvHeim ? 700 : 400, fontSize: 14, textAlign: 'right', color: !tsvHeim ? 'var(--blau)' : 'var(--text)' }}>
-                    {s.gast}
-                  </div>
+                {/* Heim / Auswärts */}
+                <div style={{ fontSize: 12, marginBottom: 4 }}>
+                  <span style={{
+                    background: s.istHeim ? '#d4edda' : '#fff3cd',
+                    color: s.istHeim ? '#155724' : '#7a5800',
+                    borderRadius: 6, padding: '2px 8px', fontWeight: 700, fontSize: 11
+                  }}>
+                    {s.istHeim ? '🏠 Heim' : '✈️ Auswärts'}
+                  </span>
                 </div>
+                {/* Gegner */}
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 4, lineHeight: 1.2 }}>
+                  {s.gegner}
+                </div>
+                {/* Platz des Gegners */}
+                {s.gegnerPlatz && (
+                  <div style={{ fontSize: 12, color: 'var(--grau-text)', marginBottom: 6 }}>
+                    Platz {s.gegnerPlatz}
+                  </div>
+                )}
+                {/* Datum + Uhrzeit */}
+                <div style={{ fontSize: 12, color: 'var(--blau)', fontWeight: 700 }}>
+                  {formatDatumKurz(s.datum)}
+                </div>
+                {s.uhrzeit && s.uhrzeit !== '00:00' && (
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                    {s.uhrzeit} Uhr
+                  </div>
+                )}
               </div>
-            )
-          })}
+            ))}
+          </div>
         </div>
       )}
 
