@@ -11,11 +11,11 @@ import Admin       from './pages/Admin'
 
 const SEITEN = [
   { key: 'start',       label: '🏠 Start' },
-  { key: 'termine',     label: '📅 Termine' },
+  { key: 'termine',     label: '📅 Wichtige Termine' },
   { key: 'liga',        label: '🏆 Liga' },
   { key: 'statistiken', label: '📊 Statistiken' },
   { key: 'auswaerts',   label: '✈️ Auswärts' },
-  { key: 'eintragen',   label: '🎳 Ergebnis' },
+  { key: 'eintragen',   label: '🎳 Ergebnis eintragen' },
   { key: 'admin',       label: '⚙️ Admin' },
 ]
 
@@ -32,7 +32,7 @@ export default function App() {
     <div>
       <header className="header">
         <div className="header-logo" onClick={() => navigiere('start')}>
-          <img src="/tsv-logo.svg" alt="TSV UG Logo" style={{ width: 48, height: 48 }} />
+          <img src="/tsv-logo.svg" alt="TSV UG Logo" style={{ width: 42, height: 42 }} />
           <div>
             <h1>TSV UG Kegeln</h1>
             <span>Unterpfaffenhofen-Germering e.V.</span>
