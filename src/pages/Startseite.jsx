@@ -32,7 +32,9 @@ export default function Startseite({ nav }) {
   const [naechsteTermine, setNaechsteTermine] = useState([])
   const [termineAufgeklappt, setTermineAufgeklappt] = useState(false)
   const [laden, setLaden]                     = useState(true)
-  const [ligaPlätze, setLigaPlätze]           = useState([])
+  const [rangSort, setRangSort]     = useState('schnitt')
+  const [rangDir, setRangDir]       = useState('desc')
+  const [ligaPlätze, setLigaPlätze] = useState([])
   const [naechsteSpiele, setNaechsteSpiele]   = useState([])
 
   const saison = saisonListe[saisonIdx]
@@ -46,7 +48,7 @@ export default function Startseite({ nav }) {
       // Rangliste
       const { data: erg } = await supabase
         .from('ergebnisse')
-        .select('mitglied_id, gesamt_punkte, art, mitglieder(name, mannschaft)')
+        .select('mitglied_id, gesamt_punkte, gesamt_fehler, art, mitglieder(name, mannschaft)')
         .gte('datum', saison.start).lte('datum', saison.end)
 
       if (erg) {
@@ -55,17 +57,20 @@ export default function Startseite({ nav }) {
           const id = e.mitglied_id
           const name = e.mitglieder?.name || '–'
           const mannschaft = e.mitglieder?.mannschaft || null
-          if (!map[id]) map[id] = { name, mannschaft, punkte: [], wettkampf: [], beste: 0 }
+          if (!map[id]) map[id] = { name, mannschaft, punkte: [], fehler: [], wettkampf: [], beste: 0 }
           map[id].punkte.push(e.gesamt_punkte)
+          map[id].fehler.push(e.gesamt_fehler || 0)
           map[id].beste = Math.max(map[id].beste, e.gesamt_punkte)
           if (e.art === 'wettkampf') map[id].wettkampf.push(e.gesamt_punkte)
         }
         const liste = Object.values(map).map(m => ({
           name: m.name, mannschaft: m.mannschaft,
-          schnitt: (m.punkte.reduce((a,b)=>a+b,0)/m.punkte.length).toFixed(1),
-          beste: m.beste, runden: m.punkte.length,
+          schnitt: parseFloat((m.punkte.reduce((a,b)=>a+b,0)/m.punkte.length).toFixed(1)),
+          beste: m.beste,
+          runden: m.punkte.length,
+          fehlerSchnitt: parseFloat((m.fehler.reduce((a,b)=>a+b,0)/m.fehler.length).toFixed(2)),
           wettkampfGesamt: m.wettkampf.length > 0 ? m.wettkampf.reduce((a,b)=>a+b,0) : null,
-        })).sort((a,b) => parseFloat(b.schnitt)-parseFloat(a.schnitt))
+        }))
         setRangliste(liste)
       }
 
@@ -329,7 +334,9 @@ export default function Startseite({ nav }) {
         {/* Rangliste */}
         <div className="card">
           <div className="card-title">🏆 Rangliste</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+
+          {/* Saison-Filter */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
             {saisonListe.map((s, i) => (
               <button key={i} onClick={() => setSaisonIdx(i)}
                 style={{ padding: '4px 10px', fontSize: 13, fontWeight: 700, borderRadius: 6,
@@ -340,10 +347,36 @@ export default function Startseite({ nav }) {
               </button>
             ))}
           </div>
+
+          {/* Sortierung */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+            {[
+              { key: 'schnitt',       label: 'Ø Schnitt' },
+              { key: 'beste',         label: 'Beste Runde' },
+              { key: 'runden',        label: 'Spiele' },
+              { key: 'fehlerSchnitt', label: 'Fehlwürfe' },
+            ].map(s => (
+              <button key={s.key}
+                onClick={() => {
+                  if (rangSort === s.key) setRangDir(d => d === 'desc' ? 'asc' : 'desc')
+                  else { setRangSort(s.key); setRangDir(s.key === 'fehlerSchnitt' ? 'asc' : 'desc') }
+                }}
+                style={{ padding: '3px 9px', fontSize: 12, fontWeight: 700, borderRadius: 6,
+                  border: `2px solid ${rangSort === s.key ? 'var(--blau)' : 'var(--grau-mid)'}`,
+                  background: rangSort === s.key ? '#eef3ff' : 'var(--weiss)',
+                  color: rangSort === s.key ? 'var(--blau)' : 'var(--grau-text)', cursor: 'pointer' }}>
+                {s.label} {rangSort === s.key ? (rangDir === 'desc' ? '↓' : '↑') : ''}
+              </button>
+            ))}
+          </div>
+
           {rangliste.length === 0 ? (
             <div className="empty">Keine Ergebnisse.</div>
           ) : (
-            rangliste.map((m, i) => (
+            [...rangliste].sort((a, b) => {
+              const av = a[rangSort], bv = b[rangSort]
+              return rangDir === 'desc' ? bv - av : av - bv
+            }).map((m, i) => (
               <div key={i} className="rang-karte">
                 <div className="rang-nr">{rangIcon(i)}</div>
                 <div style={{ flex: 1 }}>
@@ -354,15 +387,23 @@ export default function Startseite({ nav }) {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div className="rang-punkte">{m.schnitt}</div>
-                  <div className="rang-sub">Ø</div>
+                  {rangSort === 'schnitt' && <>
+                    <div className="rang-punkte">{m.schnitt}</div>
+                    <div className="rang-sub">Ø Schnitt</div>
+                  </>}
+                  {rangSort === 'beste' && <>
+                    <div className="rang-punkte">{m.beste}</div>
+                    <div className="rang-sub">Beste</div>
+                  </>}
+                  {rangSort === 'runden' && <>
+                    <div className="rang-punkte">{m.runden}</div>
+                    <div className="rang-sub">Spiele</div>
+                  </>}
+                  {rangSort === 'fehlerSchnitt' && <>
+                    <div className="rang-punkte" style={{ color: '#c0392b' }}>{m.fehlerSchnitt}</div>
+                    <div className="rang-sub">Ø Fehler</div>
+                  </>}
                 </div>
-                {m.wettkampfGesamt !== null && (
-                  <div style={{ textAlign: 'right', marginLeft: 6, background: '#fff3cd', borderRadius: 8, padding: '4px 8px' }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#7a5800' }}>{m.wettkampfGesamt}</div>
-                    <div style={{ fontSize: 11, color: '#7a5800' }}>WK</div>
-                  </div>
-                )}
               </div>
             ))
           )}

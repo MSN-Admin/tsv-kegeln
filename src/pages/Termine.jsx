@@ -47,12 +47,16 @@ export default function Termine() {
   function artStyle(art) {
     if (art === 'training')  return { bg: '#dce8ff', color: '#003D8F' }
     if (art === 'wettkampf') return { bg: '#fff3cd', color: '#7a5800' }
+    if (art === 'ausflug')   return { bg: '#fde8ff', color: '#6a0080' }
+    if (art === 'sitzung')   return { bg: '#e8f4ff', color: '#005a8e' }
     return { bg: '#d4edda', color: '#155724' }
   }
 
   function artLabel(art) {
     if (art === 'training')  return '🎳 Training'
     if (art === 'wettkampf') return '🏆 Wettkampf'
+    if (art === 'ausflug')   return '🚌 Ausflug'
+    if (art === 'sitzung')   return '📋 Sitzung'
     return '📌 Sonstiges'
   }
 

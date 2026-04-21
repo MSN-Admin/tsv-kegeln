@@ -107,11 +107,12 @@ export default function Liga() {
     setLaden(false)
   }
 
+  const WOTAGE = ['So.','Mo.','Di.','Mi.','Do.','Fr.','Sa.']
   function formatDatum(d) {
     if (!d) return ''
     const date = new Date(d)
     if (isNaN(date)) return d
-    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
+    return `${WOTAGE[date.getDay()]} ${date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}`
   }
 
   // Alle Spiele – nur TSV-Spiele, nach Datum sortiert

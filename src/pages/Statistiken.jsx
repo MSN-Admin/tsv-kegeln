@@ -4,11 +4,11 @@ import { supabase } from '../supabaseClient'
 function getSaisonListe() {
   const heute = new Date()
   const aktJahr = heute.getMonth() >= 8 ? heute.getFullYear() : heute.getFullYear() - 1
-  const liste = [{ label: 'Alle Daten', start: '2000-01-01', end: '2099-12-31' }]
-  for (let j = aktJahr; j >= aktJahr - 4; j--) {
-    liste.push({ label: `${j}/${String(j+1).slice(2)}`, start: `${j}-09-01`, end: `${j+1}-04-30` })
-  }
-  return liste
+  // Aktuelle Saison + nächste Saison
+  return [
+    { label: `${aktJahr}/${String(aktJahr+1).slice(2)}`, start: `${aktJahr}-09-01`, end: `${aktJahr+1}-04-30` },
+    { label: `${aktJahr+1}/${String(aktJahr+2).slice(2)}`, start: `${aktJahr+1}-09-01`, end: `${aktJahr+2}-04-30` },
+  ]
 }
 
 export default function Statistiken() {
@@ -145,7 +145,7 @@ export default function Statistiken() {
                   </div>
                   <div style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>
                     {m.name}
-                    {m.mannschaftsfuehrer && <span style={{ marginLeft: 6, fontSize: 14 }}>🏅</span>}
+                    {m.mannschaftsfuehrer && <span style={{ marginLeft: 6, fontSize: 14 }}>Ⓒ</span>}
                   </div>
                   <div style={{ fontSize: 20, color: aktiv ? FARBEN[idx] : 'var(--grau-mid)' }}>
                     {aktiv ? '✓' : '+'}
@@ -161,41 +161,70 @@ export default function Statistiken() {
       {vergleichIds.length >= 2 && (
         <div className="card">
           <div className="card-title">Vergleich – {saison.label}</div>
-          <div className="vergleich-cards" style={{ display: 'grid', gridTemplateColumns: `repeat(${vergleichIds.length}, minmax(200px, 1fr))`, gap: 12, marginBottom: 20 }}>
-            {vergleichIds.map((id, idx) => {
+          {(() => {
+            // Alle Werte pro Metrik berechnen
+            const alleWerte = vergleichIds.map(id => {
               const vd = vergleichDaten[id]
               if (!vd) return null
               const punkte = vd.daten.map(e => e.gesamt_punkte)
               const volle  = vd.daten.map(e => e.volle_punkte)
               const abr    = vd.daten.map(e => e.abraeumen_punkte)
               const fehler = vd.daten.map(e => e.gesamt_fehler)
-              return (
-                <div key={id} style={{ background: '#f7f7f7', borderRadius: 10, padding: 14, borderTop: `4px solid ${FARBEN[idx]}` }}>
-                  <div style={{ fontWeight: 700, fontSize: 16, color: FARBEN[idx], marginBottom: 10 }}>{vd.name}</div>
-                  {[
-                    { label: 'Ø Gesamt', val: schnitt(punkte) },
-                    { label: 'Beste Runde', val: punkte.length ? Math.max(...punkte) : '–' },
-                    { label: 'Ø Volle', val: schnitt(volle) },
-                    { label: 'Ø Abräumen', val: schnitt(abr) },
-                    { label: 'Ø Fehler', val: schnitt(fehler) },
-                    { label: 'Runden', val: punkte.length },
-                  ].map((r, ri) => (
-                    <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--grau-mid)', fontSize: 14 }}>
-                      <span style={{ color: 'var(--grau-text)' }}>{r.label}</span>
-                      <span style={{ fontWeight: 700 }}>{r.val}</span>
-                    </div>
-                  ))}
-                </div>
-              )
-            })}
-          </div>
+              return {
+                id,
+                schnittGesamt: parseFloat(schnitt(punkte)) || 0,
+                besteRunde:    punkte.length ? Math.max(...punkte) : 0,
+                schnittVolle:  parseFloat(schnitt(volle)) || 0,
+                schnittAbr:    parseFloat(schnitt(abr)) || 0,
+                schnittFehler: parseFloat(schnitt(fehler)) || 0,
+                runden:        punkte.length,
+              }
+            }).filter(Boolean)
 
-          {/* Formkurven überlagert */}
-          {vergleichIds.map((id, idx) => {
-            const vd = vergleichDaten[id]
-            if (!vd || vd.daten.length < 2) return null
-            return null // Kurven-Rendering unten
-          })}
+            // Für jede Metrik: wer ist bester/schlechtester
+            // höher = besser außer bei Fehlern (niedriger = besser)
+            function highlightFarbe(metrik, wert, alleW, hoeherBesser = true) {
+              const werte = alleW.map(w => w[metrik]).filter(v => v > 0)
+              if (werte.length < 2) return {}
+              const best  = hoeherBesser ? Math.max(...werte) : Math.min(...werte)
+              const worst = hoeherBesser ? Math.min(...werte) : Math.max(...werte)
+              if (wert === best && wert !== worst)  return { color: '#155724', background: '#d4edda', borderRadius: 4, padding: '0 4px' }
+              if (wert === worst && wert !== best) return { color: '#721c24', background: '#f8d7da', borderRadius: 4, padding: '0 4px' }
+              return {}
+            }
+
+            return (
+              <div className="vergleich-cards" style={{ display: 'grid', gridTemplateColumns: `repeat(${vergleichIds.length}, minmax(180px, 1fr))`, gap: 12, marginBottom: 20 }}>
+                {vergleichIds.map((id, idx) => {
+                  const vd = vergleichDaten[id]
+                  if (!vd) return null
+                  const w = alleWerte.find(w => w.id === id)
+                  if (!w) return null
+                  const metriken = [
+                    { label: 'Ø Gesamt',    val: schnitt(vd.daten.map(e=>e.gesamt_punkte)),    key: 'schnittGesamt',  hoeher: true },
+                    { label: 'Beste Runde', val: w.besteRunde || '–',                           key: 'besteRunde',     hoeher: true },
+                    { label: 'Ø Volle',     val: schnitt(vd.daten.map(e=>e.volle_punkte)),      key: 'schnittVolle',   hoeher: true },
+                    { label: 'Ø Abräumen',  val: schnitt(vd.daten.map(e=>e.abraeumen_punkte)), key: 'schnittAbr',     hoeher: true },
+                    { label: 'Ø Fehler',    val: schnitt(vd.daten.map(e=>e.gesamt_fehler)),     key: 'schnittFehler',  hoeher: false },
+                    { label: 'Runden',      val: vd.daten.length,                               key: 'runden',         hoeher: true },
+                  ]
+                  return (
+                    <div key={id} style={{ background: '#f7f7f7', borderRadius: 10, padding: 14, borderTop: `4px solid ${FARBEN[idx]}` }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: FARBEN[idx], marginBottom: 10 }}>{vd.name}</div>
+                      {metriken.map((r, ri) => (
+                        <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid var(--grau-mid)', fontSize: 14 }}>
+                          <span style={{ color: 'var(--grau-text)' }}>{r.label}</span>
+                          <span style={{ fontWeight: 700, ...highlightFarbe(r.key, w[r.key], alleWerte, r.hoeher) }}>
+                            {r.val}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
         </div>
       )}
     </div>
@@ -229,7 +258,7 @@ export default function Statistiken() {
                   <div className="mitglied-name">
                     {m.name}
                     {m.mannschaftsfuehrer && (
-                      <span title="Mannschaftsführer*in" style={{ marginLeft: 6, fontSize: 16 }}>🏅</span>
+                      <span title="Mannschaftsführer*in" style={{ marginLeft: 6, fontSize: 16 }}>Ⓒ</span>
                     )}
                   </div>
                 </div>
@@ -285,7 +314,7 @@ export default function Statistiken() {
             <div style={{ fontSize: 22, fontWeight: 700 }}>
               {ausgewaehlt.name}
               {ausgewaehlt.mannschaftsfuehrer && (
-                <span title="Mannschaftsführer*in" style={{ marginLeft: 8, fontSize: 18 }}>🏅</span>
+                <span title="Mannschaftsführer*in" style={{ marginLeft: 8, fontSize: 18 }}>Ⓒ</span>
               )}
             </div>
             {ausgewaehlt.mannschaft && (

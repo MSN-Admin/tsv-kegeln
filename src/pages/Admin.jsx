@@ -239,6 +239,8 @@ export default function Admin() {
                 <select value={tArt} onChange={e => setTArt(e.target.value)}>
                   <option value="training">Training</option>
                   <option value="wettkampf">Wettkampf</option>
+                  <option value="ausflug">Ausflug</option>
+                  <option value="sitzung">Sitzung</option>
                   <option value="sonstiges">Sonstiges</option>
                 </select>
               </div>
@@ -367,7 +369,7 @@ export default function Admin() {
                   {mitglieder.map((m, i) => (
                     <tr key={i}>
                       <td style={{ fontWeight: 600 }}>
-                        {m.mannschaftsfuehrer && <span title="Mannschaftsführer*in" style={{ marginRight: 4 }}>🏅</span>}
+                        {m.mannschaftsfuehrer && <span title="Mannschaftsführer*in" style={{ marginRight: 4 }}>Ⓒ</span>}
                         {m.name}
                       </td>
                       <td>
@@ -384,7 +386,7 @@ export default function Admin() {
                           onClick={() => toggleKapit(m)}
                           title={m.mannschaftsfuehrer ? 'Kapitänsbinde entfernen' : 'Zum/zur Mannschaftsführer*in machen'}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20 }}>
-                          {m.mannschaftsfuehrer ? '🏅' : '○'}
+                          {m.mannschaftsfuehrer ? 'Ⓒ' : '○'}
                         </button>
                       </td>
                       <td>
