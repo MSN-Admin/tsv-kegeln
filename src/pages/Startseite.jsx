@@ -14,9 +14,13 @@ function getSaisonListe() {
 
 function mannschaftLabel(m) { return m ? `G${m}` : '' }
 
+const WOTAGE = ['So.','Mo.','Di.','Mi.','Do.','Fr.','Sa.']
+
 function formatDatumKurz(d) {
   if (!d) return ''
-  return new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  const date = new Date(d)
+  if (isNaN(date)) return d
+  return `${WOTAGE[date.getDay()]} ${date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}`
 }
 function formatDatumLang(d) {
   if (!d) return ''
