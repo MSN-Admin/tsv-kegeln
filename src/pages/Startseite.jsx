@@ -175,7 +175,6 @@ export default function Startseite({ nav }) {
         }
 
         return { label: l.label, id_liga: l.id_liga, platz: z?.platz || null, von: Array.isArray(tabData) ? tabData.length : null, mp: z?.mp || null }
-      }))
       setLigaPlätze(plätze)
       setNaechsteSpiele(alleSpiele.sort((a,b) => new Date(a.datum) - new Date(b.datum)))
     }
@@ -235,85 +234,94 @@ export default function Startseite({ nav }) {
         </div>
       )}
 
-      {/* Liga Miniübersicht – schlicht, kein Farbbalken */}
+      {/* Aktuelle Tabellenplätze + Nächste Spiele – gemeinsame Card */}
       {ligaPlätze.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16, cursor: 'pointer' }}
-          onClick={() => nav('liga')}>
-          {ligaPlätze.map((l, i) => (
-            <div key={i} style={{
-              background: 'var(--weiss)', borderRadius: 'var(--radius)',
-              boxShadow: 'var(--shadow)', padding: '14px 10px', textAlign: 'center',
-              border: '2px solid var(--blau)',
-            }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 6 }}>
-                {l.label.split('–')[0].trim()}
-              </div>
-              {l.platz ? (
-                <>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--blau)' }}>
-                    {l.platz}. Platz
+        <div className="card" style={{ marginBottom: 16, cursor: 'pointer' }} onClick={() => nav('liga')}>
+          <div className="card-title" style={{ fontSize: 16 }}>🏆 Aktuelle Tabellenplätze</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {LIGEN.map((liga, i) => {
+              const l = ligaPlätze.find(p => p.id_liga === liga.id_liga) || {}
+              return (
+                <div key={i} style={{
+                  background: 'var(--grau-hell)', borderRadius: 10,
+                  padding: '14px 10px', textAlign: 'center',
+                  border: '2px solid var(--blau)',
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 6 }}>
+                    {liga.label.split('–')[0].trim()}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--grau-text)', marginTop: 2 }}>
-                    von {l.von} Mannschaften
-                  </div>
-                </>
-              ) : (
-                <div style={{ fontSize: 13, color: 'var(--grau-text)' }}>–</div>
-              )}
-            </div>
-          ))}
+                  {l.platz ? (
+                    <>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--blau)' }}>
+                        {l.platz}. Platz
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--grau-text)', marginTop: 2 }}>
+                        von {l.von} Mannschaften
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 13, color: 'var(--grau-text)', marginTop: 8 }}>–</div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
-      {/* Nächste Spiele aller Mannschaften – 3-spaltig */}
-      {naechsteSpiele.length > 0 && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-title" style={{ fontSize: 16 }}>📅 Nächste Spiele</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            {naechsteSpiele.map((s, i) => (
+      {/* Nächste Spiele – immer 3 Spalten G1/G2/G3 */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-title" style={{ fontSize: 16 }}>📅 Nächste Spiele</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          {LIGEN.map((liga, i) => {
+            const spiel = naechsteSpiele.find(s => s.ligaLabel === liga.label.split('–')[0].trim())
+            return (
               <div key={i} style={{
                 background: 'var(--grau-hell)', borderRadius: 10,
                 padding: '12px 10px', textAlign: 'center',
                 border: '2px solid var(--blau)',
               }}>
-                {/* Liga */}
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blau)', marginBottom: 6, letterSpacing: 0.5 }}>
-                  {s.ligaLabel}
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blau)', marginBottom: 6 }}>
+                  {liga.label.split('–')[0].trim()}
                 </div>
-                {/* Heim / Auswärts */}
-                <div style={{ fontSize: 12, marginBottom: 4 }}>
-                  <span style={{
-                    background: s.istHeim ? '#d4edda' : '#fff3cd',
-                    color: s.istHeim ? '#155724' : '#7a5800',
-                    borderRadius: 6, padding: '2px 8px', fontWeight: 700, fontSize: 11
-                  }}>
-                    {s.istHeim ? '🏠 Heim' : '✈️ Auswärts'}
-                  </span>
-                </div>
-                {/* Gegner */}
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 4, lineHeight: 1.2 }}>
-                  {s.gegner}
-                </div>
-                {/* Platz des Gegners */}
-                {s.gegnerPlatz && (
-                  <div style={{ fontSize: 12, color: 'var(--grau-text)', marginBottom: 6 }}>
-                    Platz {s.gegnerPlatz}
-                  </div>
-                )}
-                {/* Datum + Uhrzeit */}
-                <div style={{ fontSize: 12, color: 'var(--blau)', fontWeight: 700 }}>
-                  {formatDatumKurz(s.datum)}
-                </div>
-                {s.uhrzeit && s.uhrzeit !== '00:00' && (
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-                    {s.uhrzeit} Uhr
+                {spiel ? (
+                  <>
+                    <div style={{ fontSize: 12, marginBottom: 4 }}>
+                      <span style={{
+                        background: spiel.istHeim ? '#d4edda' : '#fff3cd',
+                        color: spiel.istHeim ? '#155724' : '#7a5800',
+                        borderRadius: 6, padding: '2px 8px', fontWeight: 700, fontSize: 11
+                      }}>
+                        {spiel.istHeim ? '🏠 Heim' : '✈️ Auswärts'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4, lineHeight: 1.3 }}>
+                      {spiel.gegner}
+                    </div>
+                    {spiel.gegnerPlatz && (
+                      <div style={{ fontSize: 12, color: 'var(--grau-text)', marginBottom: 4 }}>
+                        Platz {spiel.gegnerPlatz}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 12, color: 'var(--blau)', fontWeight: 700 }}>
+                      {formatDatumKurz(spiel.datum)}
+                    </div>
+                    {spiel.uhrzeit && spiel.uhrzeit !== '00:00' && (
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                        {spiel.uhrzeit} Uhr
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--grau-text)', marginTop: 8, fontStyle: 'italic' }}>
+                    Saison beendet
                   </div>
                 )}
               </div>
-            ))}
-          </div>
+            )
+          })}
         </div>
-      )}
+      </div>
 
       <div className="start-grid grid-2" style={{ gap: 14 }}>
 

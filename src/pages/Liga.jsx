@@ -208,34 +208,31 @@ export default function Liga() {
       {/* SPIELE */}
       {!laden && !fehler && ansicht === 'spiele' && (
         <div>
-          {/* Kommende Spiele */}
-          {ausstehend.length > 0 && (
-            <div className="card" style={{ marginBottom: 16 }}>
-              <div className="card-title" style={{ fontSize: 16 }}>📅 Kommende Spiele</div>
-              {ausstehend.map((s, i) => <SpielZeile key={i} s={s} formatDatum={formatDatum} />)}
-            </div>
+          {/* Nächstes Spiel */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="card-title" style={{ fontSize: 16 }}>📅 Nächstes Spiel</div>
+            {ausstehend.length > 0 ? (
+              <SpielZeile s={ausstehend[0]} formatDatum={formatDatum} />
+            ) : (
+              <div className="empty" style={{ fontStyle: 'italic' }}>Saison beendet</div>
+            )}
+          </div>
+
+          {/* Letztes Spiel */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="card-title" style={{ fontSize: 16 }}>✅ Letztes Spiel</div>
+            {gespielt.length > 0 ? (
+              <SpielZeile s={gespielt[0]} formatDatum={formatDatum} />
+            ) : (
+              <div className="empty" style={{ fontStyle: 'italic' }}>Noch kein Spiel ausgetragen</div>
+            )}
+          </div>
+
+          {/* Alle weiteren Ergebnisse aufklappbar */}
+          {gespielt.length > 1 && (
+            <AlleSpieleAufklappbar spiele={gespielt.slice(1)} formatDatum={formatDatum} />
           )}
 
-          {/* Ergebnisse nach Spieltag gruppiert */}
-          {gespieltGruppiert.map((gruppe, gi) => (
-            <div key={gi} className="card" style={{ marginBottom: 12 }}>
-              <div style={{
-                fontSize: 14, fontWeight: 700, color: 'var(--blau)',
-                marginBottom: 12, paddingBottom: 8,
-                borderBottom: '2px solid var(--gelb)',
-              }}>
-                {gruppe.spieltag || formatDatum(gruppe.datum)}
-                {gruppe.datum && gruppe.spieltag && (
-                  <span style={{ fontWeight: 400, color: 'var(--grau-text)', marginLeft: 8, fontSize: 13 }}>
-                    · {formatDatum(gruppe.datum)}
-                  </span>
-                )}
-              </div>
-              {gruppe.spiele.map((s, i) => <SpielZeile key={i} s={s} formatDatum={formatDatum} />)}
-            </div>
-          ))}
-
-          {spieleGesamt.length === 0 && <div className="empty">Keine Spiele verfügbar.</div>}
           <div style={{ fontSize: 12, color: 'var(--grau-text)', textAlign: 'right', marginTop: 8 }}>
             Daten: bskv.sportwinner.de
           </div>
@@ -386,6 +383,23 @@ function SpielZeile({ s, formatDatum }) {
           ) : (
             <div style={{ fontSize: 13, color: 'var(--grau-text)', padding: '8px 0' }}>Keine Details verfügbar.</div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AlleSpieleAufklappbar({ spiele, formatDatum }) {
+  const [offen, setOffen] = useState(false)
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <button onClick={() => setOffen(o => !o)}
+        style={{ background: 'none', border: 'none', color: 'var(--blau)', fontWeight: 700, fontSize: 15, cursor: 'pointer', padding: 0, width: '100%', textAlign: 'left' }}>
+        {offen ? '▲ Weniger anzeigen' : `▼ Alle weiteren Ergebnisse (${spiele.length})`}
+      </button>
+      {offen && (
+        <div style={{ marginTop: 12 }}>
+          {spiele.map((s, i) => <SpielZeile key={i} s={s} formatDatum={formatDatum} />)}
         </div>
       )}
     </div>
