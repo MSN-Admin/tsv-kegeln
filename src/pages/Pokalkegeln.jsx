@@ -49,7 +49,9 @@ export default function Pokalkegeln() {
       .from('pokal_paarungen')
       .select('*, s1:spieler1_id(id,name), s2:spieler2_id(id,name), s3:spieler3_id(id,name), sieger:sieger_id(id,name)')
       .eq('turnier_id', tid)
-      .order('runde').order('erstellt_am')
+      .order('datum', { ascending: true })
+      .order('uhrzeit', { ascending: true })
+      .order('runde', { ascending: true })
     setPaarungen(data || [])
     setLaden(false)
   }
@@ -64,11 +66,15 @@ export default function Pokalkegeln() {
   }
 
   const maxRunde = paarungen.length > 0 ? Math.max(...paarungen.map(p => p.runde)) : 1
-  const runden_gruppen = {}
+
+  // Nach Datum gruppieren (Paarungen ohne Datum am Ende)
+  const datumGruppen = {}
   for (const p of paarungen) {
-    if (!runden_gruppen[p.runde]) runden_gruppen[p.runde] = []
-    runden_gruppen[p.runde].push(p)
+    const key = p.datum || '9999-99-99'
+    if (!datumGruppen[key]) datumGruppen[key] = []
+    datumGruppen[key].push(p)
   }
+  const sortierteDaten = Object.keys(datumGruppen).sort()
 
   // Ergebnis eintragen Flow
   function startEintragen(paarung) {
@@ -270,15 +276,16 @@ export default function Pokalkegeln() {
         ))}
       </div>
 
-      {/* Bracket */}
-      {Object.keys(runden_gruppen).sort((a,b) => parseInt(a)-parseInt(b)).map(rundeNr => {
-        const gruppe = runden_gruppen[rundeNr]
+      {/* Bracket – nach Datum gruppiert */}
+      {sortierteDaten.map(datum => {
+        const gruppe = datumGruppen[datum]
+        const anzRunden = [...new Set(gruppe.map(p => p.runde))]
         return (
-          <div key={rundeNr} className="card" style={{ marginBottom: 16 }}>
+          <div key={datum} className="card" style={{ marginBottom: 16 }}>
             <div className="card-title" style={{ fontSize: 16 }}>
-              {rundenName(parseInt(rundeNr), maxRunde)}
+              {datum === '9999-99-99' ? 'Datum noch offen' : formatDatum(datum)}
               <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--grau-text)', marginLeft: 8 }}>
-                {gruppe.length} Paarung{gruppe.length !== 1 ? 'en' : ''}
+                {anzRunden.map(r => rundenName(r, maxRunde)).join(' · ')}
               </span>
             </div>
             {gruppe.map((p, i) => {
