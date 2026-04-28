@@ -43,6 +43,41 @@ export default function Admin() {
   const [ortMeldung, setOrtMeldung] = useState('')
   const [neuerOrtName, setNeuerOrtName] = useState('')
 
+  // Pokalkegeln
+  const [pokalTurniere, setPokalTurniere]   = useState([])
+  const [pokalPaarungen, setPokalPaarungen] = useState([])
+  const [aktivPokalId, setAktivPokalId]     = useState(null)
+  const [pkJahr, setPkJahr]                 = useState(new Date().getFullYear())
+  const [pkName, setPkName]                 = useState('TSV UG Pokalturnier')
+  const [pkMeldung, setPkMeldung]           = useState('')
+  // Neue Paarung
+  const [ppRunde, setPpRunde]               = useState(1)
+  const [ppS1, setPpS1]                     = useState('')
+  const [ppS2, setPpS2]                     = useState('')
+  const [ppS3, setPpS3]                     = useState('')
+  const [ppDatum, setPpDatum]               = useState('')
+  const [ppUhrzeit, setPpUhrzeit]           = useState('')
+  const [ppOrt, setPpOrt]                   = useState('')
+  const [ppMeldung, setPpMeldung]           = useState('')
+  // Sieger setzen
+  const [siegerId, setSiegerId]             = useState({})
+
+  // Spezialtraining
+  const [spezTrainings, setSpezTrainings]   = useState([])
+  const [spezPaarungen, setSpezPaarungen]   = useState([])
+  const [aktivSpezId, setAktivSpezId]       = useState(null)
+  const [stBez, setStBez]                   = useState('')
+  const [stDatum, setStDatum]               = useState('')
+  const [stOrt, setStOrt]                   = useState('')
+  const [stMeldung, setStMeldung]           = useState('')
+  const [spH1, setSpH1]                     = useState('')
+  const [spH2, setSpH2]                     = useState('')
+  const [spG1, setSpG1]                     = useState('')
+  const [spG2, setSpG2]                     = useState('')
+  const [spUhrzeit, setSpUhrzeit]           = useState('')
+  const [spOrt, setSpOrt]                   = useState('')
+  const [spMeldung, setSpMeldung]           = useState('')
+
   function login() {
     if (pw === ADMIN_PASSWORT) { setEingeloggt(true); ladeAlles() }
     else setPwFehler('Falsches Passwort.')
@@ -55,7 +90,39 @@ export default function Admin() {
     setTermine(t || [])
     const { data: o } = await supabase.from('auswaertsorte').select('*').order('name')
     setOrte(o || [])
+    const { data: pt } = await supabase.from('pokal_turniere').select('*').order('jahr', { ascending: false })
+    setPokalTurniere(pt || [])
+    if (pt && pt.length > 0 && !aktivPokalId) {
+      setAktivPokalId(pt[0].id)
+      ladePokalPaarungen(pt[0].id)
+    } else if (aktivPokalId) {
+      ladePokalPaarungen(aktivPokalId)
+    }
+    const { data: st } = await supabase.from('spezial_trainings').select('*').order('datum', { ascending: false })
+    setSpezTrainings(st || [])
+    if (st && st.length > 0 && !aktivSpezId) {
+      setAktivSpezId(st[0].id)
+      ladeSpezPaarungen(st[0].id)
+    } else if (aktivSpezId) {
+      ladeSpezPaarungen(aktivSpezId)
+    }
     await ladeErgebnisse()
+  }
+
+  async function ladePokalPaarungen(tid) {
+    const { data } = await supabase
+      .from('pokal_paarungen')
+      .select('*, s1:spieler1_id(id,name), s2:spieler2_id(id,name), s3:spieler3_id(id,name), sieger:sieger_id(id,name)')
+      .eq('turnier_id', tid).order('runde').order('erstellt_am')
+    setPokalPaarungen(data || [])
+  }
+
+  async function ladeSpezPaarungen(tid) {
+    const { data } = await supabase
+      .from('spezial_paarungen')
+      .select('*, h1:heim1_id(id,name), h2:heim2_id(id,name), g1:gast1_id(id,name), g2:gast2_id(id,name)')
+      .eq('training_id', tid).order('uhrzeit')
+    setSpezPaarungen(data || [])
   }
 
   async function ladeErgebnisse() {
@@ -246,6 +313,8 @@ export default function Admin() {
           { key: 'ergebnisse', label: '🎳 Ergebnisse' },
           { key: 'mitglieder', label: '👥 Mitglieder' },
           { key: 'orte',       label: '✈️ Auswärts' },
+          { key: 'pokal',      label: '🏆 Pokal' },
+          { key: 'spezial',    label: '🎯 Spezial' },
         ].map(t => (
           <button key={t.key} className={tab === t.key ? 'btn btn-primary' : 'btn btn-outline'}
             style={{ fontSize: 13, padding: '10px 6px' }} onClick={() => setTab(t.key)}>
@@ -558,6 +627,274 @@ export default function Admin() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ── POKAL ── */}
+      {tab === 'pokal' && (
+        <div>
+          {/* Turnier anlegen */}
+          <div className="card">
+            <div className="card-title">🏆 Pokalturnier anlegen</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+              <div className="form-group"><label>Jahr</label>
+                <input type="number" value={pkJahr} onChange={e => setPkJahr(e.target.value)} /></div>
+              <div className="form-group"><label>Name</label>
+                <input type="text" value={pkName} onChange={e => setPkName(e.target.value)} /></div>
+            </div>
+            {pkMeldung && <p style={{ color: pkMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)', marginBottom: 12, fontWeight: 700 }}>{pkMeldung}</p>}
+            <button className="btn btn-gelb btn-voll" onClick={async () => {
+              setPkMeldung('')
+              const { error } = await supabase.from('pokal_turniere').insert({ jahr: parseInt(pkJahr), name: pkName })
+              if (error) { setPkMeldung('Fehler: ' + error.message); return }
+              setPkMeldung('✓ Turnier angelegt!')
+              ladeAlles()
+            }}>Turnier anlegen</button>
+          </div>
+
+          {/* Turnier wählen */}
+          {pokalTurniere.length > 0 && (
+            <>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {pokalTurniere.map(t => (
+                  <button key={t.id} onClick={() => { setAktivPokalId(t.id); ladePokalPaarungen(t.id) }}
+                    style={{ padding: '6px 14px', fontSize: 14, fontWeight: 700, borderRadius: 8,
+                      border: `2px solid ${aktivPokalId === t.id ? 'var(--blau)' : 'var(--grau-mid)'}`,
+                      background: aktivPokalId === t.id ? 'var(--blau)' : 'var(--weiss)',
+                      color: aktivPokalId === t.id ? 'var(--weiss)' : 'var(--grau-text)', cursor: 'pointer' }}>
+                    Pokal {t.jahr}
+                  </button>
+                ))}
+              </div>
+
+              {/* Paarung anlegen */}
+              {aktivPokalId && (
+                <div className="card">
+                  <div className="card-title" style={{ fontSize: 16 }}>Paarung anlegen</div>
+                  <div className="form-group">
+                    <label>Runde</label>
+                    <select value={ppRunde} onChange={e => setPpRunde(e.target.value)}>
+                      {[1,2,3,4,5,6].map(r => <option key={r} value={r}>{r}. Runde</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div className="form-group"><label>Spieler 1</label>
+                      <select value={ppS1} onChange={e => setPpS1(e.target.value)}>
+                        <option value="">– wählen –</option>
+                        {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group"><label>Spieler 2</label>
+                      <select value={ppS2} onChange={e => setPpS2(e.target.value)}>
+                        <option value="">– wählen –</option>
+                        {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group"><label>Spieler 3 (Finale, optional)</label>
+                      <select value={ppS3} onChange={e => setPpS3(e.target.value)}>
+                        <option value="">– keiner –</option>
+                        {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group"><label>Datum</label>
+                      <input type="date" value={ppDatum} onChange={e => setPpDatum(e.target.value)} /></div>
+                    <div className="form-group"><label>Uhrzeit</label>
+                      <input type="time" value={ppUhrzeit} onChange={e => setPpUhrzeit(e.target.value)} /></div>
+                    <div className="form-group"><label>Ort</label>
+                      <input type="text" value={ppOrt} onChange={e => setPpOrt(e.target.value)} /></div>
+                  </div>
+                  {ppMeldung && <p style={{ color: ppMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)', marginBottom: 12, fontWeight: 700 }}>{ppMeldung}</p>}
+                  <button className="btn btn-primary btn-voll" onClick={async () => {
+                    setPpMeldung('')
+                    if (!ppS1 || !ppS2) { setPpMeldung('Bitte mind. 2 Spieler wählen.'); return }
+                    const { error } = await supabase.from('pokal_paarungen').insert({
+                      turnier_id: aktivPokalId, runde: parseInt(ppRunde),
+                      spieler1_id: ppS1, spieler2_id: ppS2,
+                      spieler3_id: ppS3 || null,
+                      datum: ppDatum || null, uhrzeit: ppUhrzeit || null, ort: ppOrt || null
+                    })
+                    if (error) { setPpMeldung('Fehler: ' + error.message); return }
+                    setPpMeldung('✓ Paarung angelegt!')
+                    setPpS1(''); setPpS2(''); setPpS3(''); setPpDatum(''); setPpUhrzeit(''); setPpOrt('')
+                    ladePokalPaarungen(aktivPokalId)
+                  }}>Paarung anlegen</button>
+                </div>
+              )}
+
+              {/* Paarungen Liste mit Sieger setzen */}
+              {pokalPaarungen.length > 0 && (
+                <div className="card">
+                  <div className="card-title" style={{ fontSize: 16 }}>Paarungen & Sieger</div>
+                  {[...new Set(pokalPaarungen.map(p => p.runde))].sort().map(runde => (
+                    <div key={runde} style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--grau-text)', letterSpacing: 1, marginBottom: 8 }}>{runde}. RUNDE</div>
+                      {pokalPaarungen.filter(p => p.runde === runde).map((p, i) => (
+                        <div key={i} style={{ border: '2px solid var(--grau-mid)', borderRadius: 10, padding: 12, marginBottom: 8, background: p.sieger_id ? '#f0faf4' : 'var(--grau-hell)' }}>
+                          <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                            {p.s1?.name} vs. {p.s2?.name}{p.s3 ? ` vs. ${p.s3.name}` : ''}
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--grau-text)', marginBottom: 8 }}>
+                            {p.datum && `📅 ${p.datum}`} {p.uhrzeit && `🕐 ${p.uhrzeit.slice(0,5)}`}
+                          </div>
+                          {p.sieger_id ? (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ color: 'var(--gruen)', fontWeight: 700 }}>✓ Sieger: {p.sieger?.name}</span>
+                              <button onClick={async () => {
+                                await supabase.from('pokal_paarungen').update({ sieger_id: null }).eq('id', p.id)
+                                ladePokalPaarungen(aktivPokalId)
+                              }} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 13 }}>zurücksetzen</button>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                              <span style={{ fontSize: 13, fontWeight: 700 }}>Sieger:</span>
+                              {[p.s1, p.s2, p.s3].filter(Boolean).map(s => (
+                                <button key={s.id} onClick={async () => {
+                                  await supabase.from('pokal_paarungen').update({ sieger_id: s.id }).eq('id', p.id)
+                                  ladePokalPaarungen(aktivPokalId)
+                                }} style={{ padding: '6px 12px', borderRadius: 8, border: '2px solid var(--blau)', background: 'var(--weiss)', color: 'var(--blau)', fontWeight: 700, cursor: 'pointer' }}>
+                                  {s.name}
+                                </button>
+                              ))}
+                              <button onClick={async () => {
+                                if (!confirm('Paarung löschen?')) return
+                                await supabase.from('pokal_paarungen').delete().eq('id', p.id)
+                                ladePokalPaarungen(aktivPokalId)
+                              }} style={{ marginLeft: 'auto', background: 'none', border: '2px solid #c0392b', color: '#c0392b', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}>🗑️</button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── SPEZIAL-TRAINING ── */}
+      {tab === 'spezial' && (
+        <div>
+          {/* Training anlegen */}
+          <div className="card">
+            <div className="card-title">🎯 Spezial-Training anlegen</div>
+            <div className="form-group"><label>Bezeichnung</label>
+              <input type="text" value={stBez} onChange={e => setStBez(e.target.value)} placeholder="z.B. Spieltag-Simulation April 2026" /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-group"><label>Datum</label>
+                <input type="date" value={stDatum} onChange={e => setStDatum(e.target.value)} /></div>
+              <div className="form-group"><label>Ort</label>
+                <input type="text" value={stOrt} onChange={e => setStOrt(e.target.value)} /></div>
+            </div>
+            {stMeldung && <p style={{ color: stMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)', marginBottom: 12, fontWeight: 700 }}>{stMeldung}</p>}
+            <button className="btn btn-gelb btn-voll" onClick={async () => {
+              setStMeldung('')
+              if (!stBez || !stDatum) { setStMeldung('Bitte Bezeichnung und Datum ausfüllen.'); return }
+              const { error } = await supabase.from('spezial_trainings').insert({ bezeichnung: stBez, datum: stDatum, ort: stOrt || null })
+              if (error) { setStMeldung('Fehler: ' + error.message); return }
+              setStMeldung('✓ Training angelegt!')
+              setStBez(''); setStDatum(''); setStOrt('')
+              ladeAlles()
+            }}>Training anlegen</button>
+          </div>
+
+          {/* Training wählen */}
+          {spezTrainings.length > 0 && (
+            <>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {spezTrainings.map(t => (
+                  <button key={t.id} onClick={() => { setAktivSpezId(t.id); ladeSpezPaarungen(t.id) }}
+                    style={{ padding: '6px 14px', fontSize: 14, fontWeight: 700, borderRadius: 8,
+                      border: `2px solid ${aktivSpezId === t.id ? 'var(--blau)' : 'var(--grau-mid)'}`,
+                      background: aktivSpezId === t.id ? 'var(--blau)' : 'var(--weiss)',
+                      color: aktivSpezId === t.id ? 'var(--weiss)' : 'var(--grau-text)', cursor: 'pointer' }}>
+                    {t.bezeichnung}
+                  </button>
+                ))}
+              </div>
+
+              {/* Paarung anlegen */}
+              {aktivSpezId && (
+                <div className="card">
+                  <div className="card-title" style={{ fontSize: 16 }}>2 vs. 2 Paarung anlegen</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blau)', marginBottom: 8 }}>🏠 HEIM</div>
+                      <div className="form-group"><label>Spieler 1</label>
+                        <select value={spH1} onChange={e => setSpH1(e.target.value)}>
+                          <option value="">– wählen –</option>
+                          {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select></div>
+                      <div className="form-group"><label>Spieler 2</label>
+                        <select value={spH2} onChange={e => setSpH2(e.target.value)}>
+                          <option value="">– wählen –</option>
+                          {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select></div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#7a5800', marginBottom: 8 }}>✈️ GAST</div>
+                      <div className="form-group"><label>Spieler 1</label>
+                        <select value={spG1} onChange={e => setSpG1(e.target.value)}>
+                          <option value="">– wählen –</option>
+                          {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select></div>
+                      <div className="form-group"><label>Spieler 2</label>
+                        <select value={spG2} onChange={e => setSpG2(e.target.value)}>
+                          <option value="">– wählen –</option>
+                          {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select></div>
+                    </div>
+                    <div className="form-group"><label>Uhrzeit</label>
+                      <input type="time" value={spUhrzeit} onChange={e => setSpUhrzeit(e.target.value)} /></div>
+                    <div className="form-group"><label>Ort (optional)</label>
+                      <input type="text" value={spOrt} onChange={e => setSpOrt(e.target.value)} /></div>
+                  </div>
+                  {spMeldung && <p style={{ color: spMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)', marginBottom: 12, fontWeight: 700 }}>{spMeldung}</p>}
+                  <button className="btn btn-primary btn-voll" onClick={async () => {
+                    setSpMeldung('')
+                    if (!spH1 || !spG1) { setSpMeldung('Bitte mind. je 1 Spieler pro Team wählen.'); return }
+                    const { error } = await supabase.from('spezial_paarungen').insert({
+                      training_id: aktivSpezId,
+                      heim1_id: spH1 || null, heim2_id: spH2 || null,
+                      gast1_id: spG1 || null, gast2_id: spG2 || null,
+                      uhrzeit: spUhrzeit || null, ort: spOrt || null
+                    })
+                    if (error) { setSpMeldung('Fehler: ' + error.message); return }
+                    setSpMeldung('✓ Paarung angelegt!')
+                    setSpH1(''); setSpH2(''); setSpG1(''); setSpG2(''); setSpUhrzeit(''); setSpOrt('')
+                    ladeSpezPaarungen(aktivSpezId)
+                  }}>Paarung anlegen</button>
+                </div>
+              )}
+
+              {/* Paarungen anzeigen */}
+              {spezPaarungen.length > 0 && (
+                <div className="card">
+                  <div className="card-title" style={{ fontSize: 16 }}>Spielplan</div>
+                  {spezPaarungen.map((p, i) => (
+                    <div key={i} style={{ border: '2px solid var(--grau-mid)', borderRadius: 10, padding: 12, marginBottom: 8, background: 'var(--grau-hell)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          {p.uhrzeit && <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blau)', marginBottom: 6 }}>🕐 {p.uhrzeit.slice(0,5)} Uhr</div>}
+                          <div style={{ fontSize: 14 }}>
+                            <span style={{ fontWeight: 700 }}>🏠 {p.h1?.name}{p.h2 ? ` & ${p.h2.name}` : ''}</span>
+                            <span style={{ color: 'var(--grau-text)', margin: '0 8px' }}>vs.</span>
+                            <span style={{ fontWeight: 700 }}>✈️ {p.g1?.name}{p.g2 ? ` & ${p.g2.name}` : ''}</span>
+                          </div>
+                        </div>
+                        <button onClick={async () => {
+                          if (!confirm('Paarung löschen?')) return
+                          await supabase.from('spezial_paarungen').delete().eq('id', p.id)
+                          ladeSpezPaarungen(aktivSpezId)
+                        }} style={{ background: 'none', border: '2px solid #c0392b', color: '#c0392b', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}>🗑️</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
