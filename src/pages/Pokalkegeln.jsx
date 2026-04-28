@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 
-const RUNDEN_NAMEN = ['', '1. Runde', 'Viertelfinale', 'Halbfinale', 'Finale']
-function rundenName(r, maxRunde) {
-  if (r === maxRunde) return 'Finale'
-  if (r === maxRunde - 1) return 'Halbfinale'
-  if (r === maxRunde - 2) return 'Viertelfinale'
-  return `${r}. Runde`
+const RUNDEN_LABELS = {
+  1: '1. Runde',
+  2: '2. Runde',
+  3: 'Viertelfinale',
+  4: 'Halbfinale',
+  5: 'Finale',
+  6: 'Finale',
+}
+
+function rundenName(r) {
+  return RUNDEN_LABELS[r] || `${r}. Runde`
 }
 
 export default function Pokalkegeln() {
@@ -65,11 +70,15 @@ export default function Pokalkegeln() {
     return mitglieder.find(m => m.id === id)?.name || '–'
   }
 
-  const maxRunde = paarungen.length > 0 ? Math.max(...paarungen.map(p => p.runde)) : 1
+  const [filterRunde, setFilterRunde] = useState(null) // null = alle
 
-  // Nach Datum gruppieren (Paarungen ohne Datum am Ende)
+  const maxRunde = paarungen.length > 0 ? Math.max(...paarungen.map(p => p.runde)) : 1
+  const alleRunden = [...new Set(paarungen.map(p => p.runde))].sort((a,b) => a-b)
+
+  // Nach Datum gruppieren, optional nach Runde filtern
+  const gefiltertePaarungen = filterRunde ? paarungen.filter(p => p.runde === filterRunde) : paarungen
   const datumGruppen = {}
-  for (const p of paarungen) {
+  for (const p of gefiltertePaarungen) {
     const key = p.datum || '9999-99-99'
     if (!datumGruppen[key]) datumGruppen[key] = []
     datumGruppen[key].push(p)
@@ -157,7 +166,7 @@ export default function Pokalkegeln() {
         <div className="card-title">🎳 Ergebnis eintragen</div>
         <div style={{ background: 'var(--grau-hell)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
           <div style={{ fontSize: 13, color: 'var(--grau-text)', marginBottom: 4 }}>
-            {rundenName(aktivPaarung.runde, maxRunde)} · {formatDatum(aktivPaarung.datum) || 'Datum offen'}
+            {rundenName(aktivPaarung.runde)} · {formatDatum(aktivPaarung.datum) || 'Datum offen'}
             {aktivPaarung.uhrzeit && ` · ${aktivPaarung.uhrzeit.slice(0,5)} Uhr`}
           </div>
           <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--blau)' }}>
@@ -276,6 +285,28 @@ export default function Pokalkegeln() {
         ))}
       </div>
 
+      {/* Runden-Filter */}
+      {alleRunden.length > 1 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+          <button onClick={() => setFilterRunde(null)}
+            style={{ padding: '5px 12px', fontSize: 13, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
+              border: `2px solid ${filterRunde === null ? 'var(--blau)' : 'var(--grau-mid)'}`,
+              background: filterRunde === null ? 'var(--blau)' : 'var(--weiss)',
+              color: filterRunde === null ? 'var(--weiss)' : 'var(--grau-text)' }}>
+            Alle Runden
+          </button>
+          {alleRunden.map(r => (
+            <button key={r} onClick={() => setFilterRunde(r)}
+              style={{ padding: '5px 12px', fontSize: 13, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
+                border: `2px solid ${filterRunde === r ? 'var(--blau)' : 'var(--grau-mid)'}`,
+                background: filterRunde === r ? 'var(--blau)' : 'var(--weiss)',
+                color: filterRunde === r ? 'var(--weiss)' : 'var(--grau-text)' }}>
+              {rundenName(r)}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Bracket – nach Datum gruppiert */}
       {sortierteDaten.map(datum => {
         const gruppe = datumGruppen[datum]
@@ -285,7 +316,7 @@ export default function Pokalkegeln() {
             <div className="card-title" style={{ fontSize: 16 }}>
               {datum === '9999-99-99' ? 'Datum noch offen' : formatDatum(datum)}
               <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--grau-text)', marginLeft: 8 }}>
-                {anzRunden.map(r => rundenName(r, maxRunde)).join(' · ')}
+                {anzRunden.map(r => rundenName(r)).join(' · ')}
               </span>
             </div>
             {gruppe.map((p, i) => {
