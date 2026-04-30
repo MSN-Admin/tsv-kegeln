@@ -12,16 +12,31 @@ import Pokalkegeln    from './pages/Pokalkegeln'
 import Tandemkegeln   from './pages/Tandemkegeln'
 import SpezialTraining from './pages/SpezialTraining'
 
-// Vereins-PIN – hier ändern
-const VEREINS_PIN = '2026'
+// Vereins-PIN wird serverseitig geprüft – kein Klartext im Bundle
+const VERIFY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-vereinspin`
 const SESSION_KEY = 'tsv_zugang'
+
+async function pruefVereinsPin(pin) {
+  const res = await fetch(VERIFY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin, typ: 'verein' }),
+  })
+  const { ok } = await res.json()
+  return ok
+}
 
 function PinGate({ onErfolg }) {
   const [pin, setPin]       = useState('')
   const [fehler, setFehler] = useState(false)
+  const [laden, setLaden]   = useState(false)
 
-  function pruefen() {
-    if (pin === VEREINS_PIN) {
+  async function pruefen() {
+    if (!pin || laden) return
+    setLaden(true)
+    const ok = await pruefVereinsPin(pin)
+    setLaden(false)
+    if (ok) {
       sessionStorage.setItem(SESSION_KEY, '1')
       onErfolg()
     } else {
@@ -34,8 +49,7 @@ function PinGate({ onErfolg }) {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', background: 'var(--grau-hell)',
-      padding: '24px',
+      justifyContent: 'center', background: 'var(--grau-hell)', padding: '24px',
     }}>
       <div style={{
         background: '#fff', borderRadius: 16, padding: '40px 32px',
@@ -71,14 +85,13 @@ function PinGate({ onErfolg }) {
             ⚠️ Falscher PIN
           </p>
         )}
-        <button
-          onClick={pruefen}
+        <button onClick={pruefen} disabled={laden || !pin}
           style={{
             width: '100%', padding: '14px', fontSize: 17, fontWeight: 700,
-            background: '#003D8F', color: '#fff', border: 'none',
-            borderRadius: 10, cursor: 'pointer',
+            background: laden ? '#888' : '#003D8F', color: '#fff', border: 'none',
+            borderRadius: 10, cursor: laden ? 'wait' : 'pointer',
           }}>
-          Einloggen
+          {laden ? '⏳ Prüfe…' : 'Einloggen'}
         </button>
         <p style={{ fontSize: 12, color: '#aaa', marginTop: 20 }}>
           Nur für Mitglieder der Kegelabteilung
