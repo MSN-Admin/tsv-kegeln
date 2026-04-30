@@ -3,6 +3,8 @@ import { supabase } from '../supabaseClient'
 
 const VERIFY_PIN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-pin`
 
+const LEER = { volle_punkte: '', volle_fehler: '0', abraeumen_punkte: '', abraeumen_fehler: '0' }
+
 const S = {
   seite: { maxWidth: 500, margin: '0 auto' },
   schritt: { background: '#fff', borderRadius: 12, padding: 24, marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' },
