@@ -176,7 +176,8 @@ export default function Admin() {
   async function pinAendern(m) {
     const neuerPin = prompt(`Neuer PIN für ${m.name}:`)
     if (!neuerPin) return
-    await supabase.from('mitglieder').update({ pin_hash: neuerPin }).eq('id', m.id)
+    const { error } = await supabase.rpc('update_mitglied_pin', { p_id: m.id, p_pin: neuerPin })
+    if (error) { alert('Fehler: ' + error.message); return }
     alert('PIN geändert.')
   }
 
