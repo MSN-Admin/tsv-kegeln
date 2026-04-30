@@ -51,7 +51,6 @@ export default function Admin() {
   const [pkJahr, setPkJahr]                 = useState(new Date().getFullYear())
   const [pkName, setPkName]                 = useState('TSV UG Pokalturnier')
   const [pkMeldung, setPkMeldung]           = useState('')
-  // Neue Paarung
   const [ppRunde, setPpRunde]               = useState(1)
   const [ppS1, setPpS1]                     = useState('')
   const [ppS2, setPpS2]                     = useState('')
@@ -60,7 +59,8 @@ export default function Admin() {
   const [ppUhrzeit, setPpUhrzeit]           = useState('')
   const [ppOrt, setPpOrt]                   = useState('')
   const [ppMeldung, setPpMeldung]           = useState('')
-  // Sieger setzen
+  const [ppBearbeite, setPpBearbeite]       = useState(null)
+  const [ppEditWerte, setPpEditWerte]       = useState({})
   const [siegerId, setSiegerId]             = useState({})
 
   // Spezialtraining
@@ -665,9 +665,9 @@ export default function Admin() {
             }}>Turnier anlegen</button>
           </div>
 
-          {/* Turnier wählen */}
           {pokalTurniere.length > 0 && (
             <>
+              {/* Turnier wählen */}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
                 {pokalTurniere.map(t => (
                   <button key={t.id} onClick={() => { setAktivPokalId(t.id); ladePokalPaarungen(t.id) }}
@@ -680,107 +680,257 @@ export default function Admin() {
                 ))}
               </div>
 
-              {/* Paarung anlegen */}
-              {aktivPokalId && (
-                <div className="card">
-                  <div className="card-title" style={{ fontSize: 16 }}>Paarung anlegen</div>
-                  <div className="form-group">
-                    <label>Runde</label>
-                    <select value={ppRunde} onChange={e => setPpRunde(e.target.value)}>
-                      {[1,2,3,4,5,6].map(r => <option key={r} value={r}>{r}. Runde</option>)}
-                    </select>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div className="form-group"><label>Spieler 1</label>
-                      <select value={ppS1} onChange={e => setPpS1(e.target.value)}>
-                        <option value="">– wählen –</option>
-                        {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group"><label>Spieler 2</label>
-                      <select value={ppS2} onChange={e => setPpS2(e.target.value)}>
-                        <option value="">– wählen –</option>
-                        {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group"><label>Spieler 3 (Finale, optional)</label>
-                      <select value={ppS3} onChange={e => setPpS3(e.target.value)}>
-                        <option value="">– keiner –</option>
-                        {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group"><label>Datum</label>
-                      <input type="date" value={ppDatum} onChange={e => setPpDatum(e.target.value)} /></div>
-                    <div className="form-group"><label>Uhrzeit</label>
-                      <input type="time" value={ppUhrzeit} onChange={e => setPpUhrzeit(e.target.value)} /></div>
-                    <div className="form-group"><label>Ort</label>
-                      <input type="text" value={ppOrt} onChange={e => setPpOrt(e.target.value)} /></div>
-                  </div>
-                  {ppMeldung && <p style={{ color: ppMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)', marginBottom: 12, fontWeight: 700 }}>{ppMeldung}</p>}
-                  <button className="btn btn-primary btn-voll" onClick={async () => {
-                    setPpMeldung('')
-                    if (!ppS1 || !ppS2) { setPpMeldung('Bitte mind. 2 Spieler wählen.'); return }
-                    const { error } = await supabase.from('pokal_paarungen').insert({
-                      turnier_id: aktivPokalId, runde: parseInt(ppRunde),
-                      spieler1_id: ppS1, spieler2_id: ppS2,
-                      spieler3_id: ppS3 || null,
-                      datum: ppDatum || null, uhrzeit: ppUhrzeit || null, ort: ppOrt || null
-                    })
-                    if (error) { setPpMeldung('Fehler: ' + error.message); return }
-                    setPpMeldung('✓ Paarung angelegt!')
-                    setPpS1(''); setPpS2(''); setPpS3(''); setPpDatum(''); setPpUhrzeit(''); setPpOrt('')
-                    ladePokalPaarungen(aktivPokalId)
-                  }}>Paarung anlegen</button>
-                </div>
-              )}
+              {aktivPokalId && (() => {
+                // Rundenlogik
+                const alleRunden = [...new Set(pokalPaarungen.map(p => p.runde))].sort((a,b)=>a-b)
+                const maxRunde = alleRunden.length > 0 ? Math.max(...alleRunden) : 0
 
-              {/* Paarungen Liste mit Sieger setzen */}
-              {pokalPaarungen.length > 0 && (
-                <div className="card">
-                  <div className="card-title" style={{ fontSize: 16 }}>Paarungen & Sieger</div>
-                  {[...new Set(pokalPaarungen.map(p => p.runde))].sort().map(runde => (
-                    <div key={runde} style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--grau-text)', letterSpacing: 1, marginBottom: 8 }}>{runde}. RUNDE</div>
-                      {pokalPaarungen.filter(p => p.runde === runde).map((p, i) => (
-                        <div key={i} style={{ border: '2px solid var(--grau-mid)', borderRadius: 10, padding: 12, marginBottom: 8, background: p.sieger_id ? '#f0faf4' : 'var(--grau-hell)' }}>
-                          <div style={{ fontWeight: 700, marginBottom: 8 }}>
-                            {p.s1?.name} vs. {p.s2?.name}{p.s3 ? ` vs. ${p.s3.name}` : ''}
+                // Für eine Runde: wer kommt weiter?
+                function berechneWeiterkommende(runde) {
+                  const rPaarungen = pokalPaarungen.filter(p => p.runde === runde)
+                  const alleHabenSieger = rPaarungen.every(p => p.sieger_id)
+                  if (!alleHabenSieger) return null // Runde noch nicht fertig
+
+                  const sieger = rPaarungen.map(p => p.sieger).filter(Boolean)
+                  const verlierer = rPaarungen.flatMap(p =>
+                    [p.s1, p.s2, p.s3].filter(s => s && s.id !== p.sieger_id)
+                  )
+
+                  // Bester Verlierer nötig wenn ungerade Anzahl Sieger
+                  let besterVerlierer = null
+                  if (sieger.length % 2 !== 0 && verlierer.length > 0) {
+                    // Punkte aus ergebnissen holen – wir nutzen gespeicherte Scores
+                    // Verlierer-Scores werden separat geladen (async nicht möglich hier)
+                    // Stattdessen: Admin wählt besten Verlierer manuell aus Liste
+                    besterVerlierer = verlierer // zeige alle zur Auswahl
+                  }
+
+                  return { sieger, verlierer, besterVerlierer, alleHabenSieger, ungerade: sieger.length % 2 !== 0 }
+                }
+
+                return (
+                  <>
+                    {/* Paarung anlegen */}
+                    <div className="card">
+                      <div className="card-title" style={{ fontSize: 16 }}>Paarung anlegen</div>
+                      <div className="form-group">
+                        <label>Runde</label>
+                        <select value={ppRunde} onChange={e => setPpRunde(e.target.value)}>
+                          {[1,2,3,4,5,6].map(r => <option key={r} value={r}>{r}. Runde</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div className="form-group"><label>Spieler 1</label>
+                          <select value={ppS1} onChange={e => setPpS1(e.target.value)}>
+                            <option value="">– wählen –</option>
+                            {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                          </select></div>
+                        <div className="form-group"><label>Spieler 2</label>
+                          <select value={ppS2} onChange={e => setPpS2(e.target.value)}>
+                            <option value="">– wählen –</option>
+                            {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                          </select></div>
+                        <div className="form-group"><label>Spieler 3 (Finale, optional)</label>
+                          <select value={ppS3} onChange={e => setPpS3(e.target.value)}>
+                            <option value="">– keiner –</option>
+                            {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                          </select></div>
+                        <div className="form-group"><label>Datum</label>
+                          <input type="date" value={ppDatum} onChange={e => setPpDatum(e.target.value)} /></div>
+                        <div className="form-group"><label>Uhrzeit</label>
+                          <input type="time" value={ppUhrzeit} onChange={e => setPpUhrzeit(e.target.value)} /></div>
+                        <div className="form-group"><label>Ort</label>
+                          <input type="text" value={ppOrt} onChange={e => setPpOrt(e.target.value)} /></div>
+                      </div>
+                      {ppMeldung && <p style={{ color: ppMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)', marginBottom: 12, fontWeight: 700 }}>{ppMeldung}</p>}
+                      <button className="btn btn-primary btn-voll" onClick={async () => {
+                        setPpMeldung('')
+                        if (!ppS1 || !ppS2) { setPpMeldung('Bitte mind. 2 Spieler wählen.'); return }
+                        const { error } = await supabase.from('pokal_paarungen').insert({
+                          turnier_id: aktivPokalId, runde: parseInt(ppRunde),
+                          spieler1_id: ppS1, spieler2_id: ppS2, spieler3_id: ppS3 || null,
+                          datum: ppDatum || null, uhrzeit: ppUhrzeit || null, ort: ppOrt || null
+                        })
+                        if (error) { setPpMeldung('Fehler: ' + error.message); return }
+                        setPpMeldung('✓ Paarung angelegt!')
+                        setPpS1(''); setPpS2(''); setPpS3(''); setPpDatum(''); setPpUhrzeit(''); setPpOrt('')
+                        ladePokalPaarungen(aktivPokalId)
+                      }}>Paarung anlegen</button>
+                    </div>
+
+                    {/* Paarungen nach Runde */}
+                    {alleRunden.map(runde => {
+                      const rPaarungen = pokalPaarungen.filter(p => p.runde === runde)
+                      const wk = berechneWeiterkommende(runde)
+                      const rundenLabel = runde === 5 || runde === 6 ? 'Finale' :
+                        runde === 4 ? 'Halbfinale' : runde === 3 ? 'Viertelfinale' : `${runde}. Runde`
+
+                      return (
+                        <div key={runde} className="card" style={{ marginBottom: 12 }}>
+                          <div className="card-title" style={{ fontSize: 16 }}>
+                            {rundenLabel}
+                            {wk?.alleHabenSieger && <span style={{ fontSize: 12, background: '#d4edda', color: '#155724', borderRadius: 6, padding: '2px 8px', marginLeft: 10, fontWeight: 700 }}>✓ Abgeschlossen</span>}
                           </div>
-                          <div style={{ fontSize: 13, color: 'var(--grau-text)', marginBottom: 8 }}>
-                            {p.datum && `📅 ${p.datum}`} {p.uhrzeit && `🕐 ${p.uhrzeit.slice(0,5)}`}
-                          </div>
-                          {p.sieger_id ? (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ color: 'var(--gruen)', fontWeight: 700 }}>✓ Sieger: {p.sieger?.name}</span>
-                              <button onClick={async () => {
-                                await supabase.from('pokal_paarungen').update({ sieger_id: null }).eq('id', p.id)
-                                ladePokalPaarungen(aktivPokalId)
-                              }} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 13 }}>zurücksetzen</button>
+
+                          {rPaarungen.map((p, i) => (
+                            <div key={i} style={{ border: `2px solid ${ppBearbeite === p.id ? 'var(--blau)' : p.sieger_id ? '#d4edda' : 'var(--grau-mid)'}`, borderRadius: 10, padding: 12, marginBottom: 10, background: ppBearbeite === p.id ? '#f0f4ff' : p.sieger_id ? '#f0faf4' : 'var(--grau-hell)' }}>
+
+                              {ppBearbeite === p.id ? (
+                                // ── BEARBEITEN ──
+                                <div>
+                                  <div style={{ fontWeight: 700, color: 'var(--blau)', marginBottom: 12 }}>
+                                    ✏️ Paarung bearbeiten
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                    <div className="form-group"><label>Spieler 1</label>
+                                      <select value={ppEditWerte.s1} onChange={e => setPpEditWerte(v => ({...v, s1: e.target.value}))}>
+                                        <option value="">– wählen –</option>
+                                        {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                      </select></div>
+                                    <div className="form-group"><label>Spieler 2</label>
+                                      <select value={ppEditWerte.s2} onChange={e => setPpEditWerte(v => ({...v, s2: e.target.value}))}>
+                                        <option value="">– wählen –</option>
+                                        {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                      </select></div>
+                                    <div className="form-group"><label>Spieler 3 (optional)</label>
+                                      <select value={ppEditWerte.s3} onChange={e => setPpEditWerte(v => ({...v, s3: e.target.value}))}>
+                                        <option value="">– keiner –</option>
+                                        {mitglieder.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                      </select></div>
+                                    <div className="form-group"><label>Datum</label>
+                                      <input type="date" value={ppEditWerte.datum} onChange={e => setPpEditWerte(v => ({...v, datum: e.target.value}))} /></div>
+                                    <div className="form-group"><label>Uhrzeit</label>
+                                      <input type="time" value={ppEditWerte.uhrzeit} onChange={e => setPpEditWerte(v => ({...v, uhrzeit: e.target.value}))} /></div>
+                                    <div className="form-group"><label>Ort</label>
+                                      <input type="text" value={ppEditWerte.ort} onChange={e => setPpEditWerte(v => ({...v, ort: e.target.value}))} /></div>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <button className="btn btn-gruen" style={{ flex: 1 }} onClick={async () => {
+                                      await supabase.from('pokal_paarungen').update({
+                                        spieler1_id: ppEditWerte.s1 || null,
+                                        spieler2_id: ppEditWerte.s2 || null,
+                                        spieler3_id: ppEditWerte.s3 || null,
+                                        datum: ppEditWerte.datum || null,
+                                        uhrzeit: ppEditWerte.uhrzeit || null,
+                                        ort: ppEditWerte.ort || null,
+                                      }).eq('id', p.id)
+                                      setPpBearbeite(null)
+                                      ladePokalPaarungen(aktivPokalId)
+                                    }}>✓ Speichern</button>
+                                    <button className="btn btn-outline" onClick={() => setPpBearbeite(null)}>Abbrechen</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                // ── ANSICHT ──
+                                <div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                                    <div>
+                                      <div style={{ fontWeight: 700, fontSize: 15 }}>
+                                        {p.s1?.name} vs. {p.s2?.name}{p.s3 ? ` vs. ${p.s3.name}` : ''}
+                                      </div>
+                                      <div style={{ fontSize: 13, color: 'var(--grau-text)', marginTop: 3 }}>
+                                        {p.datum && `📅 ${new Date(p.datum).toLocaleDateString('de-DE')}`}
+                                        {p.uhrzeit && ` 🕐 ${p.uhrzeit.slice(0,5)}`}
+                                        {p.ort && ` 📍 ${p.ort}`}
+                                      </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                      <button onClick={() => {
+                                        setPpBearbeite(p.id)
+                                        setPpEditWerte({ s1: p.spieler1_id||'', s2: p.spieler2_id||'', s3: p.spieler3_id||'', datum: p.datum||'', uhrzeit: p.uhrzeit||'', ort: p.ort||'' })
+                                      }} style={{ background: 'none', border: '2px solid var(--blau)', color: 'var(--blau)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 13 }}>✏️</button>
+                                      <button onClick={async () => {
+                                        if (!confirm('Paarung löschen?')) return
+                                        await supabase.from('pokal_paarungen').delete().eq('id', p.id)
+                                        ladePokalPaarungen(aktivPokalId)
+                                      }} style={{ background: 'none', border: '2px solid #c0392b', color: '#c0392b', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}>🗑️</button>
+                                    </div>
+                                  </div>
+
+                                  {/* Sieger setzen / anzeigen */}
+                                  {p.sieger_id ? (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#d4edda', borderRadius: 8, padding: '8px 12px' }}>
+                                      <span style={{ color: '#155724', fontWeight: 700 }}>🏆 Sieger: {p.sieger?.name}</span>
+                                      <button onClick={async () => {
+                                        await supabase.from('pokal_paarungen').update({ sieger_id: null }).eq('id', p.id)
+                                        ladePokalPaarungen(aktivPokalId)
+                                      }} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 13 }}>zurücksetzen</button>
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--grau-text)' }}>Sieger:</span>
+                                      {[p.s1, p.s2, p.s3].filter(Boolean).map(s => (
+                                        <button key={s.id} onClick={async () => {
+                                          await supabase.from('pokal_paarungen').update({ sieger_id: s.id }).eq('id', p.id)
+                                          ladePokalPaarungen(aktivPokalId)
+                                        }} style={{ padding: '6px 14px', borderRadius: 8, border: '2px solid var(--blau)', background: 'var(--weiss)', color: 'var(--blau)', fontWeight: 700, cursor: 'pointer' }}>
+                                          {s.name}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                              <span style={{ fontSize: 13, fontWeight: 700 }}>Sieger:</span>
-                              {[p.s1, p.s2, p.s3].filter(Boolean).map(s => (
-                                <button key={s.id} onClick={async () => {
-                                  await supabase.from('pokal_paarungen').update({ sieger_id: s.id }).eq('id', p.id)
-                                  ladePokalPaarungen(aktivPokalId)
-                                }} style={{ padding: '6px 12px', borderRadius: 8, border: '2px solid var(--blau)', background: 'var(--weiss)', color: 'var(--blau)', fontWeight: 700, cursor: 'pointer' }}>
-                                  {s.name}
-                                </button>
-                              ))}
-                              <button onClick={async () => {
-                                if (!confirm('Paarung löschen?')) return
-                                await supabase.from('pokal_paarungen').delete().eq('id', p.id)
-                                ladePokalPaarungen(aktivPokalId)
-                              }} style={{ marginLeft: 'auto', background: 'none', border: '2px solid #c0392b', color: '#c0392b', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}>🗑️</button>
+                          ))}
+
+                          {/* Rundenauswertung – wer kommt weiter */}
+                          {wk?.alleHabenSieger && (
+                            <div style={{ marginTop: 8, background: '#f0f8ff', borderRadius: 10, padding: 14, border: '2px solid var(--blau)' }}>
+                              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--blau)', marginBottom: 10 }}>
+                                📋 Topf für nächste Runde
+                              </div>
+
+                              {/* Sieger */}
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 6 }}>✅ SIEGER – kommen weiter:</div>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  {wk.sieger.map((s, i) => (
+                                    <span key={i} style={{ background: '#d4edda', color: '#155724', borderRadius: 8, padding: '5px 12px', fontWeight: 700, fontSize: 14 }}>
+                                      🏆 {s.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Bester Verlierer wenn ungerade */}
+                              {wk.ungerade && wk.verlierer.length > 0 && (
+                                <div style={{ marginTop: 10, padding: 10, background: '#fff3cd', borderRadius: 8, border: '1px solid #f5c400' }}>
+                                  <div style={{ fontSize: 12, fontWeight: 700, color: '#7a5800', marginBottom: 6 }}>
+                                    ⚡ UNGERADE ANZAHL – bester Verlierer kommt weiter:
+                                  </div>
+                                  <div style={{ fontSize: 13, color: '#7a5800', marginBottom: 8 }}>
+                                    Wähle den Verlierer mit dem höchsten Gesamtscore:
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    {wk.verlierer.map((s, i) => (
+                                      <span key={i} style={{ background: '#fff', border: '2px solid #f5c400', color: '#7a5800', borderRadius: 8, padding: '5px 12px', fontWeight: 700, fontSize: 14 }}>
+                                        {s.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <div style={{ fontSize: 12, color: '#7a5800', marginTop: 6 }}>
+                                    → Schau in Statistiken wer am besten Tag gespielt hat und trage ihn in die nächste Runde ein.
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Finale Hinweis */}
+                              {wk.sieger.length <= 3 && (
+                                <div style={{ marginTop: 10, background: '#fff3cd', borderRadius: 8, padding: 10, border: '2px solid var(--gelb)' }}>
+                                  <div style={{ fontWeight: 700, color: '#7a5800', fontSize: 14 }}>
+                                    🏆 FINALE – {wk.sieger.length === 3 ? 'alle 3 spielen gemeinsam!' : 'letzten 3 Spieler werden ermittelt'}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
+                      )
+                    })}
+                  </>
+                )
+              })()}
             </>
           )}
         </div>
