@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 
 const VERIFY_PIN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-pin`
+
+const RUNDEN_LABELS = {
   1: '1. Runde',
   2: '2. Runde',
   3: 'Viertelfinale',
