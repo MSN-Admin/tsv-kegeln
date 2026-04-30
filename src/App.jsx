@@ -12,6 +12,82 @@ import Pokalkegeln    from './pages/Pokalkegeln'
 import Tandemkegeln   from './pages/Tandemkegeln'
 import SpezialTraining from './pages/SpezialTraining'
 
+// Vereins-PIN – hier ändern
+const VEREINS_PIN = '2026'
+const SESSION_KEY = 'tsv_zugang'
+
+function PinGate({ onErfolg }) {
+  const [pin, setPin]       = useState('')
+  const [fehler, setFehler] = useState(false)
+
+  function pruefen() {
+    if (pin === VEREINS_PIN) {
+      sessionStorage.setItem(SESSION_KEY, '1')
+      onErfolg()
+    } else {
+      setFehler(true)
+      setPin('')
+      setTimeout(() => setFehler(false), 2000)
+    }
+  }
+
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', background: 'var(--grau-hell)',
+      padding: '24px',
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 16, padding: '40px 32px',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.10)', maxWidth: 340, width: '100%',
+        textAlign: 'center',
+      }}>
+        <img src="/tsv-logo.svg" alt="TSV UG Logo" style={{ width: 72, height: 72, marginBottom: 20 }} />
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: '#003D8F', marginBottom: 6 }}>
+          TSV UG Kegeln
+        </h2>
+        <p style={{ fontSize: 15, color: '#666', marginBottom: 28 }}>
+          Bitte Vereins-PIN eingeben
+        </p>
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={8}
+          value={pin}
+          autoFocus
+          onChange={e => setPin(e.target.value.replace(/[^0-9]/g, ''))}
+          onKeyDown={e => e.key === 'Enter' && pruefen()}
+          placeholder="••••"
+          style={{
+            width: '100%', padding: '14px', fontSize: 28, textAlign: 'center',
+            letterSpacing: 10, border: `2px solid ${fehler ? '#c0392b' : '#d0d0d0'}`,
+            borderRadius: 10, marginBottom: 16, outline: 'none',
+            transition: 'border-color 0.2s',
+            background: fehler ? '#fde8e8' : '#fff',
+          }}
+        />
+        {fehler && (
+          <p style={{ color: '#c0392b', fontWeight: 700, marginBottom: 12, fontSize: 15 }}>
+            ⚠️ Falscher PIN
+          </p>
+        )}
+        <button
+          onClick={pruefen}
+          style={{
+            width: '100%', padding: '14px', fontSize: 17, fontWeight: 700,
+            background: '#003D8F', color: '#fff', border: 'none',
+            borderRadius: 10, cursor: 'pointer',
+          }}>
+          Einloggen
+        </button>
+        <p style={{ fontSize: 12, color: '#aaa', marginTop: 20 }}>
+          Nur für Mitglieder der Kegelabteilung
+        </p>
+      </div>
+    </div>
+  )
+}
+
 const SEITEN = [
   { key: 'start',           label: '🏠 Start' },
   { key: 'termine',         label: '📅 Interne Termine' },
@@ -31,6 +107,11 @@ export default function App() {
   const [seite, setSeite]           = useState('start')
   const [menuOffen, setMenuOffen]   = useState(false)
   const [turniereOffen, setTurniereOffen] = useState(false)
+  const [eingeloggt, setEingeloggt] = useState(
+    sessionStorage.getItem(SESSION_KEY) === '1'
+  )
+
+  if (!eingeloggt) return <PinGate onErfolg={() => setEingeloggt(true)} />
 
   function navigiere(key) {
     setSeite(key)
