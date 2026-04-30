@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 
-const LEER = { volle_punkte: '', volle_fehler: '0', abraeumen_punkte: '', abraeumen_fehler: '0' }
+const VERIFY_PIN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-pin`
 
 const S = {
   seite: { maxWidth: 500, margin: '0 auto' },
@@ -64,8 +64,13 @@ export default function Eintragen({ nav }) {
   async function pruefePIN(danach) {
     setPinFehler('')
     if (pin.length < 4) { setPinFehler('Bitte gib deinen PIN ein (mindestens 4 Stellen).'); return }
-    const { data } = await supabase.from('mitglieder').select('pin_hash').eq('id', mitgliedId).single()
-    if (!data || data.pin_hash !== pin) { setPinFehler('Der PIN ist leider falsch. Bitte nochmal versuchen.'); return }
+    const res = await fetch(VERIFY_PIN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mitglied_id: mitgliedId, pin }),
+    })
+    const { ok } = await res.json()
+    if (!ok) { setPinFehler('Der PIN ist leider falsch. Bitte nochmal versuchen.'); return }
     danach()
   }
 
@@ -151,7 +156,11 @@ export default function Eintragen({ nav }) {
     setPinMeldung('')
     if (neuerPin1.length < 4) { setPinMeldung('PIN muss mindestens 4 Stellen haben.'); return }
     if (neuerPin1 !== neuerPin2) { setPinMeldung('Die PINs stimmen nicht überein.'); return }
-    const { error } = await supabase.from('mitglieder').update({ pin_hash: neuerPin1 }).eq('id', mitgliedId)
+    // Neuen PIN gehasht speichern via RPC
+    const { error } = await supabase.rpc('update_mitglied_pin', {
+      p_id: mitgliedId,
+      p_pin: neuerPin1,
+    })
     if (error) { setPinMeldung('Fehler: ' + error.message); return }
     setPinMeldung('✓ PIN erfolgreich geändert!')
     setNeuerPin1(''); setNeuerPin2('')

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 
-const ADMIN_PASSWORT = 'Markus'
+const VERIFY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-vereinspin`
 
 export default function Admin() {
   const [eingeloggt, setEingeloggt] = useState(false)
   const [pw, setPw]                 = useState('')
   const [pwFehler, setPwFehler]     = useState('')
+  const [pwLaden, setPwLaden]       = useState(false)
   const [tab, setTab]               = useState('termine')
 
   // Mitglieder
@@ -78,8 +79,17 @@ export default function Admin() {
   const [spOrt, setSpOrt]                   = useState('')
   const [spMeldung, setSpMeldung]           = useState('')
 
-  function login() {
-    if (pw === ADMIN_PASSWORT) { setEingeloggt(true); ladeAlles() }
+  async function login() {
+    setPwFehler('')
+    setPwLaden(true)
+    const res = await fetch(VERIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: pw, typ: 'admin' }),
+    })
+    const { ok } = await res.json()
+    setPwLaden(false)
+    if (ok) { setEingeloggt(true); ladeAlles() }
     else setPwFehler('Falsches Passwort.')
   }
 
@@ -301,7 +311,9 @@ export default function Admin() {
         <input type="password" value={pw} autoFocus onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} />
       </div>
       {pwFehler && <p style={{ color: '#c0392b', fontSize: 14, marginBottom: 12 }}>{pwFehler}</p>}
-      <button className="btn btn-primary btn-voll" onClick={login}>Anmelden</button>
+      <button className="btn btn-primary btn-voll" onClick={login} disabled={pwLaden}>
+        {pwLaden ? '⏳ Prüfe…' : 'Anmelden'}
+      </button>
     </div>
   )
 

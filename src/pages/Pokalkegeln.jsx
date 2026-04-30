@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 
-const RUNDEN_LABELS = {
+const VERIFY_PIN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-pin`
   1: '1. Runde',
   2: '2. Runde',
   3: 'Viertelfinale',
@@ -103,8 +103,13 @@ export default function Pokalkegeln() {
 
   async function pruefePIN() {
     setPinFehler('')
-    const { data } = await supabase.from('mitglieder').select('pin_hash').eq('id', eintragenSpieler).single()
-    if (!data || data.pin_hash !== pin) { setPinFehler('Falscher PIN.'); return }
+    const res = await fetch(VERIFY_PIN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mitglied_id: eintragenSpieler, pin }),
+    })
+    const { ok } = await res.json()
+    if (!ok) { setPinFehler('Falscher PIN.'); return }
     setSchritt(3)
   }
 
