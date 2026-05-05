@@ -7,7 +7,7 @@ function getSaisonListe() {
   const aktJahr = heute.getMonth() >= 8 ? heute.getFullYear() : heute.getFullYear() - 1
   const liste = []
   for (let j = aktJahr; j >= 2025; j--) {
-    liste.push({ label: `${j}/${String(j + 1).slice(2)}`, start: `${j}-09-01`, end: `${j + 1}-04-30` })
+    liste.push({ label: `${j}/${String(j + 1).slice(2)}`, start: `${j}-09-01`, end: `${j + 1}-06-30` })
   }
   return liste
 }
@@ -204,26 +204,30 @@ export default function Startseite({ nav }) {
   if (!saison) return <div className="empty">Noch keine Saison ab 2025/26 verfügbar.</div>
   if (laden) return <div className="loading">🎳 Lade Daten…</div>
 
-  const ersterTermin = naechsteTermine[0]
-  const weitereTermine = naechsteTermine.slice(1)
+  const ersteTermine = naechsteTermine.slice(0, 2)
+  const weitereTermine = naechsteTermine.slice(2)
 
   return (
     <div>
-      {/* Nächster Termin */}
-      {ersterTermin && (
+      {/* Nächste Termine – immer 2 anzeigen */}
+      {ersteTermine.length > 0 && (
         <div className="card" style={{ borderLeft: '5px solid var(--gelb)' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 6, letterSpacing: 1 }}>NÄCHSTER TERMIN</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--blau)', marginBottom: 4 }}>{ersterTermin.titel}</div>
-          <div style={{ fontSize: 14, color: 'var(--grau-text)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <span>📅 {formatDatumLang(ersterTermin.datum)}</span>
-            {ersterTermin.uhrzeit && <span>🕐 {ersterTermin.uhrzeit.slice(0,5)} Uhr</span>}
-            {ersterTermin.ort && <span>📍 {ersterTermin.ort}</span>}
-          </div>
-          {ersterTermin.beschreibung && (
-            <div style={{ fontSize: 14, color: 'var(--grau-text)', marginTop: 6, fontStyle: 'italic' }}>
-              {ersterTermin.beschreibung}
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 6, letterSpacing: 1 }}>NÄCHSTE TERMINE</div>
+          {ersteTermine.map((t, i) => (
+            <div key={i} style={{ paddingBottom: 10, marginBottom: i < ersteTermine.length - 1 ? 10 : 0, borderBottom: i < ersteTermine.length - 1 ? '1px solid var(--grau-mid)' : 'none' }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--blau)', marginBottom: 4 }}>{t.titel}</div>
+              <div style={{ fontSize: 14, color: 'var(--grau-text)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <span>📅 {formatDatumLang(t.datum)}</span>
+                {t.uhrzeit && <span>🕐 {t.uhrzeit.slice(0,5)} Uhr</span>}
+                {t.ort && <span>📍 {t.ort}</span>}
+              </div>
+              {t.beschreibung && (
+                <div style={{ fontSize: 14, color: 'var(--grau-text)', marginTop: 6, fontStyle: 'italic' }}>
+                  {t.beschreibung}
+                </div>
+              )}
             </div>
-          )}
+          ))}
           {weitereTermine.length > 0 && (
             <>
               <button onClick={() => setTermineAufgeklappt(o => !o)}
