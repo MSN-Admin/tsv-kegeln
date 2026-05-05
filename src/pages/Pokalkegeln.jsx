@@ -134,11 +134,48 @@ export default function Pokalkegeln() {
       abraeumen_punkte: parseInt(r.abraeumen_punkte) || 0,
       abraeumen_fehler: parseInt(r.abraeumen_fehler) || 0,
     }))
-    const { error } = await supabase.from('ergebnisse').insert(rows)
-    if (error) { setMeldung('Fehler: ' + error.message); setSpeichern(false); return }
-    setMeldung('✓ Ergebnis gespeichert!')
+    const { data: insertData, error } = await supabase.from('ergebnisse').insert(rows).select()
+    if (error) {
+      setMeldung('Fehler: ' + error.message)
+      setSpeichern(false)
+      return
+    }
+    if (!insertData || insertData.length === 0) {
+      setMeldung('Fehler: Daten wurden nicht gespeichert. Bitte Admin kontaktieren.')
+      setSpeichern(false)
+      return
+    }
+    // Gesamtpunkte berechnen für Anzeige
+    const gesamt = rows.reduce((s, r) => s + r.volle_punkte + r.abraeumen_punkte, 0)
+    setMeldung(`✓ Ergebnis gespeichert! Gesamtpunkte: ${gesamt}`)
     setSpeichern(false)
-    setTimeout(() => { setEintragenId(null); setMeldung('') }, 2000)
+    // Ergebnisse neu laden damit sie angezeigt werden
+    await ladeErgebnisseProPaarung(paarung)
+    setTimeout(() => { setEintragenId(null); setMeldung('') }, 3000)
+  }
+
+  // Ergebnisse pro Paarung laden
+  const [paarungErgebnisse, setPaarungErgebnisse] = useState({})
+
+  async function ladeErgebnisseProPaarung(paarung) {
+    if (!paarung?.datum) return
+    const spielerIds = [paarung.spieler1_id, paarung.spieler2_id, paarung.spieler3_id].filter(Boolean)
+    const { data } = await supabase
+      .from('ergebnisse')
+      .select('mitglied_id, runde, volle_punkte, abraeumen_punkte, gesamt_punkte, mitglieder(name)')
+      .in('mitglied_id', spielerIds)
+      .eq('datum', paarung.datum)
+      .eq('art', 'wettkampf')
+      .order('runde')
+    if (data) {
+      const map = {}
+      for (const e of data) {
+        if (!map[e.mitglied_id]) map[e.mitglied_id] = { name: e.mitglieder?.name, runden: [], gesamt: 0 }
+        map[e.mitglied_id].runden.push(e.gesamt_punkte)
+        map[e.mitglied_id].gesamt += e.gesamt_punkte
+      }
+      setPaarungErgebnisse(prev => ({ ...prev, [paarung.id]: map }))
+    }
   }
 
   const aktivPaarung = paarungen.find(p => p.id === eintragenId)
@@ -348,19 +385,36 @@ export default function Pokalkegeln() {
 
                   {/* Spieler */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    {[p.s1, p.s2, p.s3].filter(Boolean).map((s, si) => (
-                      <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {si > 0 && <span style={{ color: 'var(--grau-text)', fontWeight: 700 }}>vs.</span>}
-                        <div style={{
-                          padding: '8px 14px', borderRadius: 8, fontWeight: 700, fontSize: 15,
-                          background: p.sieger_id === s.id ? 'var(--gelb)' : 'var(--weiss)',
-                          color: p.sieger_id === s.id ? 'var(--blau)' : 'var(--text)',
-                          border: `2px solid ${p.sieger_id === s.id ? 'var(--gelb)' : 'var(--grau-mid)'}`,
-                        }}>
-                          {p.sieger_id === s.id && '🏆 '}{s.name}
+                    {[p.s1, p.s2, p.s3].filter(Boolean).map((s, si) => {
+                      const erg = paarungErgebnisse[p.id]?.[s.id]
+                      return (
+                        <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {si > 0 && <span style={{ color: 'var(--grau-text)', fontWeight: 700 }}>vs.</span>}
+                          <div style={{ borderRadius: 8, overflow: 'hidden', border: `2px solid ${p.sieger_id === s.id ? 'var(--gelb)' : 'var(--grau-mid)'}` }}>
+                            <div style={{
+                              padding: '8px 14px', fontWeight: 700, fontSize: 15,
+                              background: p.sieger_id === s.id ? 'var(--gelb)' : 'var(--weiss)',
+                              color: p.sieger_id === s.id ? 'var(--blau)' : 'var(--text)',
+                            }}>
+                              {p.sieger_id === s.id && '🏆 '}{s.name}
+                            </div>
+                            {erg && (
+                              <div style={{ background: 'var(--grau-hell)', padding: '4px 14px', fontSize: 13, color: 'var(--blau)', fontWeight: 700, textAlign: 'center' }}>
+                                {erg.gesamt} Pkt · {erg.runden.length}R
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
+
+                    {/* Ergebnisse laden Button */}
+                    {!paarungErgebnisse[p.id] && p.datum && (
+                      <button onClick={() => ladeErgebnisseProPaarung(p)}
+                        style={{ marginLeft: 8, background: 'none', border: '1px solid var(--grau-mid)', color: 'var(--grau-text)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}>
+                        Ergebnisse laden
+                      </button>
+                    )}
 
                     {/* Ergebnis eintragen Button */}
                     {!hatSieger && p.datum && (
