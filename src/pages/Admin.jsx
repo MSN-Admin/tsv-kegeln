@@ -36,6 +36,13 @@ export default function Admin() {
   const [bearbeite, setBearbeite]   = useState(null)
   const [editWerte, setEditWerte]   = useState({})
   const [ergMeldung, setErgMeldung] = useState('')
+  // Admin neu eintragen
+  const [neuErgMitglied, setNeuErgMitglied] = useState('')
+  const [neuErgDatum, setNeuErgDatum]       = useState(new Date().toISOString().slice(0,10))
+  const [neuErgArt, setNeuErgArt]           = useState('training')
+  const [neuErgOrt, setNeuErgOrt]           = useState('heim')
+  const [neuErgRunden, setNeuErgRunden]     = useState([{ volle_punkte: '', volle_fehler: '0', abraeumen_punkte: '', abraeumen_fehler: '0' }])
+  const [neuErgMeldung, setNeuErgMeldung]   = useState('')
 
   // Auswärtsorte
   const [orte, setOrte]             = useState([])
@@ -436,8 +443,73 @@ export default function Admin() {
 
       {/* ── ERGEBNISSE ── */}
       {tab === 'ergebnisse' && (
+        <div>
+        {/* Neu eintragen */}
         <div className="card">
-          <div className="card-title">🎳 Ergebnisse bearbeiten</div>
+          <div className="card-title" style={{ fontSize: 16 }}>🎳 Ergebnis eintragen</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-group"><label>Mitglied</label>
+              <select value={neuErgMitglied} onChange={e => setNeuErgMitglied(e.target.value)}>
+                <option value="">– wählen –</option>
+                {mitglieder.filter(m => m.aktiv).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select></div>
+            <div className="form-group"><label>Datum</label>
+              <input type="date" value={neuErgDatum} onChange={e => setNeuErgDatum(e.target.value)} /></div>
+            <div className="form-group"><label>Art</label>
+              <select value={neuErgArt} onChange={e => setNeuErgArt(e.target.value)}>
+                <option value="training">Training</option>
+                <option value="wettkampf">Wettkampf</option>
+              </select></div>
+            <div className="form-group"><label>Ort</label>
+              <select value={neuErgOrt} onChange={e => setNeuErgOrt(e.target.value)}>
+                <option value="heim">🏠 Heim</option>
+                <option value="auswaerts">✈️ Auswärts</option>
+              </select></div>
+          </div>
+          {neuErgRunden.map((r, i) => (
+            <div key={i} style={{ background: 'var(--grau-hell)', borderRadius: 10, padding: 12, marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--blau)', marginBottom: 10 }}>
+                Runde {i + 1}
+                {neuErgRunden.length > 1 && (
+                  <button onClick={() => setNeuErgRunden(p => p.filter((_,x) => x !== i))}
+                    style={{ marginLeft: 12, background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 13 }}>✕</button>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                {[['volle_punkte','Volle Pkt'],['volle_fehler','Volle Fehl'],['abraeumen_punkte','Abr. Pkt'],['abraeumen_fehler','Abr. Fehl']].map(([k,l]) => (
+                  <div key={k}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 4 }}>{l}</div>
+                    <input type="number" value={r[k]} onChange={ev => setNeuErgRunden(p => p.map((x,xi) => xi===i ? {...x,[k]:ev.target.value} : x))}
+                      style={{ width: '100%', padding: '8px', fontSize: 16, fontWeight: 700, border: '2px solid var(--grau-mid)', borderRadius: 6, textAlign: 'right' }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          <button className="btn btn-outline btn-voll" style={{ marginBottom: 10 }}
+            onClick={() => setNeuErgRunden(p => [...p, { volle_punkte: '', volle_fehler: '0', abraeumen_punkte: '', abraeumen_fehler: '0' }])}>
+            + Runde hinzufügen
+          </button>
+          {neuErgMeldung && <div style={{ background: neuErgMeldung.startsWith('Fehler') ? '#fde8e8' : '#d4edda', border: `2px solid ${neuErgMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 10, fontWeight: 700, color: neuErgMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)' }}>{neuErgMeldung}</div>}
+          <button className="btn btn-gruen btn-voll" onClick={async () => {
+            setNeuErgMeldung('')
+            if (!neuErgMitglied || !neuErgDatum) { setNeuErgMeldung('Bitte Mitglied und Datum wählen.'); return }
+            const rows = neuErgRunden.map((r, i) => ({
+              mitglied_id: neuErgMitglied, datum: neuErgDatum, art: neuErgArt, ort: neuErgOrt, runde: i + 1,
+              volle_punkte: parseInt(r.volle_punkte) || 0, volle_fehler: parseInt(r.volle_fehler) || 0,
+              abraeumen_punkte: parseInt(r.abraeumen_punkte) || 0, abraeumen_fehler: parseInt(r.abraeumen_fehler) || 0,
+            }))
+            const { error } = await supabase.from('ergebnisse').insert(rows)
+            if (error) { setNeuErgMeldung('Fehler: ' + error.message); return }
+            setNeuErgMeldung('✓ Ergebnis gespeichert!')
+            setNeuErgMitglied(''); setNeuErgDatum(''); setNeuErgRunden([{ volle_punkte: '', volle_fehler: '0', abraeumen_punkte: '', abraeumen_fehler: '0' }])
+            await ladeErgebnisse()
+            setTimeout(() => setNeuErgMeldung(''), 3000)
+          }}>✓ Ergebnis speichern</button>
+        </div>
+
+        <div className="card">
+          <div className="card-title">📋 Ergebnisse bearbeiten</div>
           {ergMeldung && (
             <div style={{ background: ergMeldung.startsWith('Fehler') ? '#fde8e8' : '#d4edda', border: `2px solid ${ergMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontWeight: 700, fontSize: 15, color: ergMeldung.startsWith('Fehler') ? '#c0392b' : 'var(--gruen)' }}>
               {ergMeldung}
@@ -498,9 +570,8 @@ export default function Admin() {
             </div>
           ))}
         </div>
+        </div>
       )}
-
-      {/* ── MITGLIEDER ── */}
       {tab === 'mitglieder' && (
         <div>
           <div className="card">
