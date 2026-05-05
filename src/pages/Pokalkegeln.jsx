@@ -11,10 +11,7 @@ const RUNDEN_LABELS = {
   5: 'Finale',
   6: 'Finale',
 }
-
-function rundenName(r) {
-  return RUNDEN_LABELS[r] || `${r}. Runde`
-}
+function rundenName(r) { return RUNDEN_LABELS[r] || `${r}. Runde` }
 
 export default function Pokalkegeln() {
   const [turniere, setTurniere]     = useState([])
@@ -22,16 +19,21 @@ export default function Pokalkegeln() {
   const [paarungen, setPaarungen]   = useState([])
   const [mitglieder, setMitglieder] = useState([])
   const [laden, setLaden]           = useState(true)
+  const [filterRunde, setFilterRunde] = useState(null)
 
-  // Ergebnis-Eintragen
-  const [eintragenId, setEintragenId] = useState(null) // paarungs-id
+  // Ergebnisse pro Paarung: { paarungId: { spielerId: { runden: [...], gesamt: X } } }
+  const [pokalErgebnisse, setPokalErgebnisse] = useState({})
+
+  // Eintragen / Bearbeiten
+  const [eintragenId, setEintragenId]     = useState(null)
   const [eintragenSpieler, setEintragenSpieler] = useState(null)
-  const [pin, setPin]               = useState('')
-  const [pinFehler, setPinFehler]   = useState('')
-  const [schritt, setSchritt]       = useState(1) // 1=spieler wählen, 2=pin, 3=ergebnisse
-  const [runden, setRunden]         = useState([])
-  const [meldung, setMeldung]       = useState('')
-  const [speichern, setSpeichern]   = useState(false)
+  const [bearbeitenModus, setBearbeitenModus] = useState(false)
+  const [pin, setPin]                     = useState('')
+  const [pinFehler, setPinFehler]         = useState('')
+  const [schritt, setSchritt]             = useState(1)
+  const [runden, setRunden]               = useState([])
+  const [meldung, setMeldung]             = useState('')
+  const [speichern, setSpeichern]         = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -42,7 +44,7 @@ export default function Pokalkegeln() {
       if (t && t.length > 0) {
         const aktiv = t.find(x => x.aktiv) || t[0]
         setAktivId(aktiv.id)
-        ladePaarungen(aktiv.id)
+        await ladePaarungen(aktiv.id)
       } else {
         setLaden(false)
       }
@@ -60,25 +62,48 @@ export default function Pokalkegeln() {
       .order('uhrzeit', { ascending: true })
       .order('runde', { ascending: true })
     setPaarungen(data || [])
+
+    // Ergebnisse für alle Paarungen laden
+    if (data && data.length > 0) {
+      const paarungIds = data.map(p => p.id)
+      const { data: ergData } = await supabase
+        .from('ergebnisse')
+        .select('id, mitglied_id, paarung_id, runde, volle_punkte, volle_fehler, abraeumen_punkte, abraeumen_fehler, gesamt_punkte')
+        .in('paarung_id', paarungIds)
+        .order('runde')
+      const map = {}
+      for (const e of (ergData || [])) {
+        if (!map[e.paarung_id]) map[e.paarung_id] = {}
+        if (!map[e.paarung_id][e.mitglied_id]) map[e.paarung_id][e.mitglied_id] = { runden: [], gesamt: 0, ids: [] }
+        map[e.paarung_id][e.mitglied_id].runden.push({
+          id: e.id, runde: e.runde, volle: e.volle_punkte, volle_f: e.volle_fehler,
+          abr: e.abraeumen_punkte, abr_f: e.abraeumen_fehler, gesamt: e.gesamt_punkte
+        })
+        map[e.paarung_id][e.mitglied_id].gesamt += e.gesamt_punkte
+        map[e.paarung_id][e.mitglied_id].ids.push(e.id)
+      }
+      setPokalErgebnisse(map)
+    }
     setLaden(false)
   }
 
   async function waehleTurnier(id) {
     setAktivId(id)
-    ladePaarungen(id)
+    await ladePaarungen(id)
   }
 
-  function mitgliedName(id) {
-    return mitglieder.find(m => m.id === id)?.name || '–'
+  function hatErgebnis(paarungId, spielerId) {
+    return pokalErgebnisse[paarungId]?.[spielerId]?.runden?.length > 0
   }
 
-  const [filterRunde, setFilterRunde] = useState(null) // null = alle
+  function spielerErgebnis(paarungId, spielerId) {
+    return pokalErgebnisse[paarungId]?.[spielerId] || null
+  }
 
   const maxRunde = paarungen.length > 0 ? Math.max(...paarungen.map(p => p.runde)) : 1
   const alleRunden = [...new Set(paarungen.map(p => p.runde))].sort((a,b) => a-b)
-
-  // Nach Datum gruppieren, optional nach Runde filtern
   const gefiltertePaarungen = filterRunde ? paarungen.filter(p => p.runde === filterRunde) : paarungen
+
   const datumGruppen = {}
   for (const p of gefiltertePaarungen) {
     const key = p.datum || '9999-99-99'
@@ -87,20 +112,34 @@ export default function Pokalkegeln() {
   }
   const sortierteDaten = Object.keys(datumGruppen).sort()
 
-  // Ergebnis eintragen Flow
-  function startEintragen(paarung) {
+  // Eintragen starten
+  function startEintragen(paarung, spieler, bearbeiten = false) {
     setEintragenId(paarung.id)
-    setEintragenSpieler(null)
+    setEintragenSpieler(spieler?.id || null)
+    setBearbeitenModus(bearbeiten)
     setPin('')
     setPinFehler('')
-    setSchritt(1)
     setMeldung('')
+
+    if (bearbeiten && spieler) {
+      const erg = spielerErgebnis(paarung.id, spieler.id)
+      if (erg) {
+        setRunden(erg.runden.map(r => ({
+          volle_punkte: String(r.volle), volle_fehler: String(r.volle_f),
+          abraeumen_punkte: String(r.abr), abraeumen_fehler: String(r.abr_f),
+        })))
+        setSchritt(2) // direkt zum PIN
+        return
+      }
+    }
+
     setRunden([
       { volle_punkte: '', volle_fehler: '0', abraeumen_punkte: '', abraeumen_fehler: '0' },
       { volle_punkte: '', volle_fehler: '0', abraeumen_punkte: '', abraeumen_fehler: '0' },
       { volle_punkte: '', volle_fehler: '0', abraeumen_punkte: '', abraeumen_fehler: '0' },
       { volle_punkte: '', volle_fehler: '0', abraeumen_punkte: '', abraeumen_fehler: '0' },
     ])
+    setSchritt(spieler ? 2 : 1)
   }
 
   async function pruefePIN() {
@@ -115,7 +154,7 @@ export default function Pokalkegeln() {
     setSchritt(3)
   }
 
-  function setRunde(i, feld, val) {
+  function setRundeWert(i, feld, val) {
     setRunden(prev => prev.map((r, mi) => mi === i ? { ...r, [feld]: val.replace(/[^0-9]/g, '') } : r))
   }
 
@@ -129,59 +168,33 @@ export default function Pokalkegeln() {
       art: 'wettkampf',
       ort: 'heim',
       runde: i + 1,
+      paarung_id: paarung.id,
       volle_punkte: parseInt(r.volle_punkte) || 0,
       volle_fehler: parseInt(r.volle_fehler) || 0,
       abraeumen_punkte: parseInt(r.abraeumen_punkte) || 0,
       abraeumen_fehler: parseInt(r.abraeumen_fehler) || 0,
     }))
-    const { data: insertData, error } = await supabase.from('ergebnisse').insert(rows).select()
+
+    if (bearbeitenModus) {
+      // Alte Ergebnisse löschen, neue einfügen
+      const alteIds = spielerErgebnis(paarung.id, eintragenSpieler)?.ids || []
+      if (alteIds.length > 0) {
+        await supabase.from('ergebnisse').delete().in('id', alteIds)
+      }
+    }
+
+    const { error } = await supabase.from('ergebnisse').insert(rows)
     if (error) {
       setMeldung('Fehler: ' + error.message)
       setSpeichern(false)
       return
     }
-    if (!insertData || insertData.length === 0) {
-      setMeldung('Fehler: Daten wurden nicht gespeichert. Bitte Admin kontaktieren.')
-      setSpeichern(false)
-      return
-    }
-    // Gesamtpunkte berechnen für Anzeige
     const gesamt = rows.reduce((s, r) => s + r.volle_punkte + r.abraeumen_punkte, 0)
-    setMeldung(`✓ Ergebnis gespeichert! Gesamtpunkte: ${gesamt}`)
+    setMeldung(`✓ ${bearbeitenModus ? 'Ergebnis aktualisiert' : 'Ergebnis gespeichert'}! Gesamtpunkte: ${gesamt}`)
     setSpeichern(false)
-    // Ergebnisse neu laden damit sie angezeigt werden
-    await ladeErgebnisseProPaarung(paarung)
+    await ladePaarungen(aktivId)
     setTimeout(() => { setEintragenId(null); setMeldung('') }, 3000)
   }
-
-  // Ergebnisse pro Paarung laden
-  const [paarungErgebnisse, setPaarungErgebnisse] = useState({})
-
-  async function ladeErgebnisseProPaarung(paarung) {
-    if (!paarung?.datum) return
-    const spielerIds = [paarung.spieler1_id, paarung.spieler2_id, paarung.spieler3_id].filter(Boolean)
-    const { data } = await supabase
-      .from('ergebnisse')
-      .select('mitglied_id, runde, volle_punkte, abraeumen_punkte, gesamt_punkte, mitglieder(name)')
-      .in('mitglied_id', spielerIds)
-      .eq('datum', paarung.datum)
-      .eq('art', 'wettkampf')
-      .order('runde')
-    if (data) {
-      const map = {}
-      for (const e of data) {
-        if (!map[e.mitglied_id]) map[e.mitglied_id] = { name: e.mitglieder?.name, runden: [], gesamt: 0 }
-        map[e.mitglied_id].runden.push(e.gesamt_punkte)
-        map[e.mitglied_id].gesamt += e.gesamt_punkte
-      }
-      setPaarungErgebnisse(prev => ({ ...prev, [paarung.id]: map }))
-    }
-  }
-
-  const aktivPaarung = paarungen.find(p => p.id === eintragenId)
-  const spielerOptionen = aktivPaarung ? [
-    aktivPaarung.s1, aktivPaarung.s2, aktivPaarung.s3
-  ].filter(Boolean) : []
 
   function formatDatum(d) {
     if (!d) return null
@@ -189,6 +202,11 @@ export default function Pokalkegeln() {
     const wo = ['So.','Mo.','Di.','Mi.','Do.','Fr.','Sa.'][date.getDay()]
     return `${wo} ${date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}`
   }
+
+  const aktivPaarung = paarungen.find(p => p.id === eintragenId)
+  const spielerOptionen = aktivPaarung
+    ? [aktivPaarung.s1, aktivPaarung.s2, aktivPaarung.s3].filter(Boolean)
+    : []
 
   if (laden) return <div className="loading">🏆 Lade Pokalturnier…</div>
 
@@ -200,14 +218,14 @@ export default function Pokalkegeln() {
     </div>
   )
 
-  // Ergebnis-Eintragen Modal
+  // ── EINTRAGEN / BEARBEITEN MODAL ──
   if (eintragenId && aktivPaarung) return (
     <div>
       <button className="btn btn-outline" style={{ marginBottom: 16 }} onClick={() => setEintragenId(null)}>
         ← Zurück zum Bracket
       </button>
       <div className="card">
-        <div className="card-title">🎳 Ergebnis eintragen</div>
+        <div className="card-title">{bearbeitenModus ? '✏️ Ergebnis bearbeiten' : '🎳 Ergebnis eintragen'}</div>
         <div style={{ background: 'var(--grau-hell)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
           <div style={{ fontSize: 13, color: 'var(--grau-text)', marginBottom: 4 }}>
             {rundenName(aktivPaarung.runde)} · {formatDatum(aktivPaarung.datum) || 'Datum offen'}
@@ -230,13 +248,30 @@ export default function Pokalkegeln() {
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>Wer bist du?</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {spielerOptionen.map(s => (
-                <button key={s.id}
-                  onClick={() => { setEintragenSpieler(s.id); setSchritt(2) }}
-                  style={{ padding: '16px', fontSize: 17, fontWeight: 700, background: 'var(--grau-hell)', border: '2px solid var(--grau-mid)', borderRadius: 10, cursor: 'pointer', textAlign: 'left' }}>
-                  {s.name}
-                </button>
-              ))}
+              {spielerOptionen.map(s => {
+                const hat = hatErgebnis(aktivPaarung.id, s.id)
+                return (
+                  <button key={s.id}
+                    onClick={() => {
+                      if (hat) {
+                        startEintragen(aktivPaarung, s, true) // Bearbeiten
+                      } else {
+                        setEintragenSpieler(s.id)
+                        setSchritt(2)
+                      }
+                    }}
+                    style={{ padding: '16px', fontSize: 17, fontWeight: 700, background: hat ? '#f0faf4' : 'var(--grau-hell)', border: `2px solid ${hat ? '#1a7a3e' : 'var(--grau-mid)'}`, borderRadius: 10, cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>{s.name}</span>
+                    {hat ? (
+                      <span style={{ fontSize: 13, color: '#1a7a3e' }}>
+                        ✓ {spielerErgebnis(aktivPaarung.id, s.id)?.gesamt} Pkt · ✏️ bearbeiten
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 13, color: 'var(--blau)' }}>→ eintragen</span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
@@ -249,6 +284,7 @@ export default function Pokalkegeln() {
             </div>
             <input type="password" inputMode="numeric" maxLength={6} value={pin}
               onChange={e => setPin(e.target.value.replace(/[^0-9]/g, ''))}
+              onKeyDown={e => e.key === 'Enter' && pruefePIN()}
               placeholder="••••" autoFocus
               style={{ width: '100%', padding: '14px', fontSize: 28, textAlign: 'center', letterSpacing: 12, border: '2px solid var(--grau-mid)', borderRadius: 10, marginBottom: 12 }} />
             {pinFehler && <div style={{ color: '#c0392b', fontWeight: 700, marginBottom: 12 }}>⚠️ {pinFehler}</div>}
@@ -272,25 +308,25 @@ export default function Pokalkegeln() {
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Volle Punkte</div>
                       <input type="number" inputMode="numeric" value={r.volle_punkte}
-                        onChange={e => setRunde(i, 'volle_punkte', e.target.value)}
+                        onChange={e => setRundeWert(i, 'volle_punkte', e.target.value)}
                         style={{ width: '100%', padding: '12px', fontSize: 20, fontWeight: 700, border: '2px solid var(--grau-mid)', borderRadius: 8 }} />
                     </div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Volle Fehler</div>
                       <input type="number" inputMode="numeric" value={r.volle_fehler}
-                        onChange={e => setRunde(i, 'volle_fehler', e.target.value)}
+                        onChange={e => setRundeWert(i, 'volle_fehler', e.target.value)}
                         style={{ width: '100%', padding: '12px', fontSize: 20, border: '2px solid var(--grau-mid)', borderRadius: 8 }} />
                     </div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Abräumen Punkte</div>
                       <input type="number" inputMode="numeric" value={r.abraeumen_punkte}
-                        onChange={e => setRunde(i, 'abraeumen_punkte', e.target.value)}
+                        onChange={e => setRundeWert(i, 'abraeumen_punkte', e.target.value)}
                         style={{ width: '100%', padding: '12px', fontSize: 20, fontWeight: 700, border: '2px solid var(--grau-mid)', borderRadius: 8 }} />
                     </div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Abräumen Fehler</div>
                       <input type="number" inputMode="numeric" value={r.abraeumen_fehler}
-                        onChange={e => setRunde(i, 'abraeumen_fehler', e.target.value)}
+                        onChange={e => setRundeWert(i, 'abraeumen_fehler', e.target.value)}
                         style={{ width: '100%', padding: '12px', fontSize: 20, border: '2px solid var(--grau-mid)', borderRadius: 8 }} />
                     </div>
                   </div>
@@ -305,7 +341,7 @@ export default function Pokalkegeln() {
             })}
             <button className="btn btn-gruen btn-voll" style={{ marginTop: 8 }}
               onClick={() => absendenErgebnis(aktivPaarung)} disabled={speichern}>
-              {speichern ? '⏳ Speichern…' : '✓ Ergebnis speichern'}
+              {speichern ? '⏳ Speichern…' : bearbeitenModus ? '✓ Ergebnis aktualisieren' : '✓ Ergebnis speichern'}
             </button>
           </div>
         )}
@@ -313,13 +349,13 @@ export default function Pokalkegeln() {
     </div>
   )
 
+  // ── BRACKET ANSICHT ──
   return (
     <div>
       {/* Turnier-Auswahl */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {turniere.map(t => (
-          <button key={t.id}
-            onClick={() => waehleTurnier(t.id)}
+          <button key={t.id} onClick={() => waehleTurnier(t.id)}
             style={{ padding: '6px 14px', fontSize: 14, fontWeight: 700, borderRadius: 8,
               border: `2px solid ${aktivId === t.id ? 'var(--blau)' : 'var(--grau-mid)'}`,
               background: aktivId === t.id ? 'var(--blau)' : 'var(--weiss)',
@@ -351,7 +387,7 @@ export default function Pokalkegeln() {
         </div>
       )}
 
-      {/* Bracket – nach Datum gruppiert */}
+      {/* Bracket nach Datum */}
       {sortierteDaten.map(datum => {
         const gruppe = datumGruppen[datum]
         const anzRunden = [...new Set(gruppe.map(p => p.runde))]
@@ -365,6 +401,9 @@ export default function Pokalkegeln() {
             </div>
             {gruppe.map((p, i) => {
               const hatSieger = !!p.sieger_id
+              const spielerListe = [p.s1, p.s2, p.s3].filter(Boolean)
+              const alleEingetragen = spielerListe.every(s => hatErgebnis(p.id, s.id))
+
               return (
                 <div key={i} style={{
                   border: `2px solid ${hatSieger ? '#d4edda' : 'var(--grau-mid)'}`,
@@ -383,47 +422,48 @@ export default function Pokalkegeln() {
                     )}
                   </div>
 
-                  {/* Spieler */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    {[p.s1, p.s2, p.s3].filter(Boolean).map((s, si) => {
-                      const erg = paarungErgebnisse[p.id]?.[s.id]
+                  {/* Spieler mit Ergebnissen */}
+                  <div style={{ display: 'flex', alignItems: 'stretch', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                    {spielerListe.map((s, si) => {
+                      const erg = spielerErgebnis(p.id, s.id)
                       return (
                         <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           {si > 0 && <span style={{ color: 'var(--grau-text)', fontWeight: 700 }}>vs.</span>}
-                          <div style={{ borderRadius: 8, overflow: 'hidden', border: `2px solid ${p.sieger_id === s.id ? 'var(--gelb)' : 'var(--grau-mid)'}` }}>
+                          <div style={{
+                            borderRadius: 10, overflow: 'hidden',
+                            border: `2px solid ${p.sieger_id === s.id ? 'var(--gelb)' : erg ? 'var(--blau)' : 'var(--grau-mid)'}`,
+                            minWidth: 100,
+                          }}>
                             <div style={{
-                              padding: '8px 14px', fontWeight: 700, fontSize: 15,
+                              padding: '8px 14px', fontWeight: 700, fontSize: 15, textAlign: 'center',
                               background: p.sieger_id === s.id ? 'var(--gelb)' : 'var(--weiss)',
                               color: p.sieger_id === s.id ? 'var(--blau)' : 'var(--text)',
                             }}>
                               {p.sieger_id === s.id && '🏆 '}{s.name}
                             </div>
                             {erg && (
-                              <div style={{ background: 'var(--grau-hell)', padding: '4px 14px', fontSize: 13, color: 'var(--blau)', fontWeight: 700, textAlign: 'center' }}>
-                                {erg.gesamt} Pkt · {erg.runden.length}R
+                              <div style={{ background: '#f0f4ff', padding: '4px 14px', fontSize: 13, color: 'var(--blau)', fontWeight: 700, textAlign: 'center', borderTop: '1px solid var(--grau-mid)' }}>
+                                {erg.gesamt} Pkt
                               </div>
                             )}
                           </div>
                         </div>
                       )
                     })}
-
-                    {/* Ergebnisse laden Button */}
-                    {!paarungErgebnisse[p.id] && p.datum && (
-                      <button onClick={() => ladeErgebnisseProPaarung(p)}
-                        style={{ marginLeft: 8, background: 'none', border: '1px solid var(--grau-mid)', color: 'var(--grau-text)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}>
-                        Ergebnisse laden
-                      </button>
-                    )}
-
-                    {/* Ergebnis eintragen Button */}
-                    {!hatSieger && p.datum && (
-                      <button onClick={() => startEintragen(p)}
-                        style={{ marginLeft: 'auto', background: 'var(--blau)', color: 'white', border: 'none', borderRadius: 8, padding: '8px 14px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-                        🎳 Ergebnis eintragen
-                      </button>
-                    )}
                   </div>
+
+                  {/* Eintragen / Bearbeiten Button */}
+                  {p.datum && (
+                    <button onClick={() => startEintragen(p, null, false)}
+                      style={{
+                        background: alleEingetragen ? 'var(--weiss)' : 'var(--blau)',
+                        color: alleEingetragen ? 'var(--blau)' : 'white',
+                        border: `2px solid var(--blau)`,
+                        borderRadius: 8, padding: '8px 14px', fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%'
+                      }}>
+                      {alleEingetragen ? '✏️ Ergebnis bearbeiten' : '🎳 Ergebnis eintragen'}
+                    </button>
+                  )}
 
                   {p.notiz && (
                     <div style={{ fontSize: 13, color: 'var(--grau-text)', marginTop: 8, fontStyle: 'italic' }}>{p.notiz}</div>
