@@ -499,8 +499,10 @@ export default function Admin() {
               volle_punkte: parseInt(r.volle_punkte) || 0, volle_fehler: parseInt(r.volle_fehler) || 0,
               abraeumen_punkte: parseInt(r.abraeumen_punkte) || 0, abraeumen_fehler: parseInt(r.abraeumen_fehler) || 0,
             }))
-            const { error } = await supabase.from('ergebnisse').insert(rows)
-            if (error) { setNeuErgMeldung('Fehler: ' + error.message); return }
+            const { data: insertData, error } = await supabase.from('ergebnisse').insert(rows).select()
+            console.log('Insert result:', insertData, error)
+            if (error) { setNeuErgMeldung('Fehler: ' + error.message + ' | ' + error.details); return }
+            if (!insertData || insertData.length === 0) { setNeuErgMeldung('Fehler: Keine Daten zurückgekommen – RLS blockiert möglicherweise den Insert.'); return }
             setNeuErgMeldung('✓ Ergebnis gespeichert!')
             setNeuErgMitglied(''); setNeuErgDatum(''); setNeuErgRunden([{ volle_punkte: '', volle_fehler: '0', abraeumen_punkte: '', abraeumen_fehler: '0' }])
             await ladeErgebnisse()
