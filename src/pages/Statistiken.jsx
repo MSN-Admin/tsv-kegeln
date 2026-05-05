@@ -6,8 +6,8 @@ function getSaisonListe() {
   const aktJahr = heute.getMonth() >= 8 ? heute.getFullYear() : heute.getFullYear() - 1
   // Aktuelle Saison + nächste Saison
   return [
-    { label: `${aktJahr}/${String(aktJahr+1).slice(2)}`, start: `${aktJahr}-09-01`, end: `${aktJahr+1}-04-30` },
-    { label: `${aktJahr+1}/${String(aktJahr+2).slice(2)}`, start: `${aktJahr+1}-09-01`, end: `${aktJahr+2}-04-30` },
+    { label: `${aktJahr}/${String(aktJahr+1).slice(2)}`, start: `${aktJahr}-09-01`, end: `${aktJahr+1}-06-30` },
+    { label: `${aktJahr+1}/${String(aktJahr+2).slice(2)}`, start: `${aktJahr+1}-09-01`, end: `${aktJahr+2}-06-30` },
   ]
 }
 
