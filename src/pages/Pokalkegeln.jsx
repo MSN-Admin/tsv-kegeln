@@ -299,10 +299,10 @@ export default function Pokalkegeln() {
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
                             {[
-                              [`r${r}_vp`, 'V.Pkt'],
-                              [`r${r}_vf`, 'V.Fehl'],
-                              [`r${r}_ap`, 'A.Pkt'],
-                              [`r${r}_af`, 'A.Fehl'],
+                              [`r${r}_vp`, 'Volle Pkt'],
+                              [`r${r}_vf`, 'Volle Fehl'],
+                              [`r${r}_ap`, 'Abr. Pkt'],
+                              [`r${r}_af`, 'Abr. Fehl'],
                             ].map(([feld, label]) => (
                               <div key={feld}>
                                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 2 }}>{label}</div>
@@ -398,31 +398,46 @@ export default function Pokalkegeln() {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'stretch', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-                    {spieler.map((s, si) => {
-                      const ges = spielerGesamt(p.id, s.id)
-                      return (
-                        <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          {si > 0 && <span style={{ color: 'var(--grau-text)', fontWeight: 700 }}>vs.</span>}
-                          <div style={{
-                            borderRadius: 10, overflow: 'hidden', minWidth: 90,
-                            border: `2px solid ${p.sieger_id === s.id ? 'var(--gelb)' : ges ? 'var(--blau)' : 'var(--grau-mid)'}`,
-                          }}>
+                    {(() => {
+                      // Höchsten Score ermitteln für Sieger-Markierung
+                      const scores = spieler.map(s => ({ id: s.id, gesamt: spielerGesamt(p.id, s.id) || 0 }))
+                      const maxScore = Math.max(...scores.map(s => s.gesamt))
+                      const hatScores = scores.some(s => s.gesamt > 0)
+
+                      return spieler.map((s, si) => {
+                        const ges = spielerGesamt(p.id, s.id)
+                        const istBester = hatScores && ges === maxScore && ges > 0
+                        const istSieger = p.sieger_id === s.id
+
+                        return (
+                          <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {si > 0 && <span style={{ color: 'var(--grau-text)', fontWeight: 700 }}>vs.</span>}
                             <div style={{
-                              padding: '8px 14px', fontWeight: 700, fontSize: 15, textAlign: 'center',
-                              background: p.sieger_id === s.id ? 'var(--gelb)' : 'var(--weiss)',
-                              color: p.sieger_id === s.id ? 'var(--blau)' : 'var(--text)',
+                              borderRadius: 10, overflow: 'hidden', minWidth: 90,
+                              border: `2px solid ${istSieger ? 'var(--gelb)' : istBester ? '#1a7a3e' : ges ? 'var(--blau)' : 'var(--grau-mid)'}`,
                             }}>
-                              {p.sieger_id === s.id && '🏆 '}{s.name}
-                            </div>
-                            {ges !== null && (
-                              <div style={{ background: '#f0f4ff', padding: '4px 14px', fontSize: 14, color: 'var(--blau)', fontWeight: 700, textAlign: 'center', borderTop: '1px solid var(--grau-mid)' }}>
-                                {ges} Pkt
+                              <div style={{
+                                padding: '8px 14px', fontWeight: 700, fontSize: 15, textAlign: 'center',
+                                background: istSieger ? 'var(--gelb)' : istBester ? '#d4edda' : 'var(--weiss)',
+                                color: istSieger ? 'var(--blau)' : istBester ? '#155724' : 'var(--text)',
+                              }}>
+                                {istSieger && '🏆 '}{istBester && !istSieger && '✓ '}{s.name}
                               </div>
-                            )}
+                              {ges !== null && (
+                                <div style={{
+                                  padding: '4px 14px', fontSize: 14, fontWeight: 700, textAlign: 'center',
+                                  borderTop: '1px solid var(--grau-mid)',
+                                  background: istBester ? '#d4edda' : '#f0f4ff',
+                                  color: istBester ? '#155724' : 'var(--blau)',
+                                }}>
+                                  {ges} Pkt
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })
+                    })()}
                   </div>
 
                   {p.datum && (
@@ -445,6 +460,67 @@ export default function Pokalkegeln() {
       })}
 
       {paarungen.length === 0 && <div className="card"><div className="empty">Noch keine Paarungen angelegt.</div></div>}
+
+      {/* Lostopf pro Runde */}
+      {alleRunden.map(runde => {
+        const rPaarungen = paarungen.filter(p => p.runde === runde)
+        const alleHabenErgebnisse = rPaarungen.every(p => {
+          const spieler = [p.s1, p.s2, p.s3].filter(Boolean)
+          return spieler.every(s => spielerGesamt(p.id, s.id) > 0)
+        })
+        if (!alleHabenErgebnisse) return null
+
+        // Gewinner pro Paarung ermitteln (höchste Punktzahl)
+        const gewinner = []
+        const verlierer = []
+        for (const p of rPaarungen) {
+          const spieler = [p.s1, p.s2, p.s3].filter(Boolean)
+          const scores = spieler.map(s => ({ ...s, gesamt: spielerGesamt(p.id, s.id) || 0 }))
+          scores.sort((a, b) => b.gesamt - a.gesamt)
+          if (scores.length > 0) gewinner.push(scores[0])
+          if (scores.length > 1) verlierer.push(...scores.slice(1))
+        }
+
+        if (filterRunde && filterRunde !== runde) return null
+
+        return (
+          <div key={`topf-${runde}`} className="card" style={{ marginBottom: 16, border: '2px solid #1a7a3e' }}>
+            <div className="card-title" style={{ fontSize: 16, color: '#155724' }}>
+              🏆 Lostopf nach {rundenName(runde)}
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#155724', marginBottom: 8 }}>✅ Weiter ({gewinner.length}):</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {gewinner.map((s, i) => (
+                  <span key={i} style={{ background: '#d4edda', color: '#155724', borderRadius: 8, padding: '6px 14px', fontWeight: 700, fontSize: 14 }}>
+                    {s.name} ({s.gesamt} Pkt)
+                  </span>
+                ))}
+              </div>
+            </div>
+            {verlierer.length > 0 && (
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#721c24', marginBottom: 8 }}>❌ Ausgeschieden ({verlierer.length}):</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {verlierer.sort((a,b) => b.gesamt - a.gesamt).map((s, i) => (
+                    <span key={i} style={{ background: '#f8d7da', color: '#721c24', borderRadius: 8, padding: '6px 14px', fontWeight: 600, fontSize: 13 }}>
+                      {s.name} ({s.gesamt} Pkt)
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {gewinner.length % 2 !== 0 && verlierer.length > 0 && (
+              <div style={{ marginTop: 10, background: '#fff3cd', borderRadius: 8, padding: 10, border: '1px solid #f5c400' }}>
+                <div style={{ fontWeight: 700, color: '#7a5800', fontSize: 13 }}>
+                  ⚡ Ungerade Anzahl Gewinner – bester Verlierer kommt auch weiter:
+                  <span style={{ marginLeft: 6, fontWeight: 900 }}>{verlierer[0]?.name} ({verlierer[0]?.gesamt} Pkt)</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
