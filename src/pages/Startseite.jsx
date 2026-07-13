@@ -7,7 +7,7 @@ function getSaisonListe() {
   const aktJahr = heute.getMonth() >= 8 ? heute.getFullYear() : heute.getFullYear() - 1
   const liste = []
   for (let j = aktJahr; j >= 2025; j--) {
-    liste.push({ label: `${j}/${String(j + 1).slice(2)}`, start: `${j}-09-01`, end: `${j + 1}-06-30` })
+    liste.push({ label: `${j}/${String(j + 1).slice(2)}`, start: `${j}-09-01`, end: `${j + 1}-08-31` })
   }
   return liste
 }

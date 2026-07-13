@@ -4,10 +4,10 @@ import { supabase } from '../supabaseClient'
 function getSaisonListe() {
   const heute = new Date()
   const aktJahr = heute.getMonth() >= 8 ? heute.getFullYear() : heute.getFullYear() - 1
-  // Aktuelle Saison + nächste Saison
+  // Saison läuft 1. Sept bis 31. Aug des Folgejahres (Sommerpause zählt zur laufenden Saison)
   return [
-    { label: `${aktJahr}/${String(aktJahr+1).slice(2)}`, start: `${aktJahr}-09-01`, end: `${aktJahr+1}-06-30` },
-    { label: `${aktJahr+1}/${String(aktJahr+2).slice(2)}`, start: `${aktJahr+1}-09-01`, end: `${aktJahr+2}-06-30` },
+    { label: `${aktJahr}/${String(aktJahr+1).slice(2)}`, start: `${aktJahr}-09-01`, end: `${aktJahr+1}-08-31` },
+    { label: `${aktJahr+1}/${String(aktJahr+2).slice(2)}`, start: `${aktJahr+1}-09-01`, end: `${aktJahr+2}-08-31` },
   ]
 }
 
@@ -84,6 +84,7 @@ export default function Statistiken() {
     return Object.values(map).map(s => ({
       ...s,
       schnitt: parseFloat((s.punkte.reduce((a,b)=>a+b,0)/s.punkte.length).toFixed(1)),
+      gesamtHolz: s.punkte.reduce((a,b)=>a+b,0),
     }))
   }
 
@@ -464,8 +465,16 @@ export default function Statistiken() {
                         </span>
                         <span className={`badge badge-${s.art}`} style={{ marginLeft: 8 }}>{s.art === 'wettkampf' ? 'WK' : 'TR'}</span>
                         <span style={{ marginLeft: 6 }}>{s.ort === 'heim' ? '🏠' : '✈️'}</span>
+                        <div style={{ fontSize: 13, color: 'var(--grau-text)', marginTop: 2 }}>
+                          {s.punkte.length} Runde{s.punkte.length !== 1 ? 'n' : ''}
+                        </div>
                       </div>
-                      <div style={{ fontWeight: 700, color: 'var(--blau)', fontSize: 18 }}>{s.schnitt} Ø</div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: 700, color: s.gesamtHolz >= 500 ? '#b8860b' : 'var(--blau)', fontSize: 18 }}>
+                          {s.gesamtHolz >= 500 && '👑 '}{s.gesamtHolz} Holz
+                        </div>
+                        <div style={{ fontSize: 13, color: 'var(--grau-text)' }}>{s.schnitt} Ø</div>
+                      </div>
                     </div>
                   ))}
                 </>
