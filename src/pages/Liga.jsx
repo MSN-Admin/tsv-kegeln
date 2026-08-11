@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react'
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sportwinner`
 
 export const LIGEN = [
-  { label: 'G1 – Kreisliga 1', id_liga: 4557 },
-  { label: 'G2 – Kreisliga 2', id_liga: 4558 },
-  { label: 'G3 – Kreisliga 3', id_liga: 4563 },
+  { label: 'G1 – Kreisliga 2', kurz: 'KL 2', id_liga: 4557 },
+  { label: 'G2 – Kreisklasse 1', kurz: 'KK 1', id_liga: 4558 },
+  { label: 'G3 – Kreisklasse 2', kurz: 'KK 2', id_liga: 4563 },
 ]
 
 const TSV_NAMEN = ['TSV Upf', 'Germering']
