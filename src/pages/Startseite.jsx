@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { LIGEN, istTSV, callSportwinner, parseTabelleZeile, parseSpieleZeile, deToIso } from './Liga'
+import { LIGEN, istTSV, callSportwinner, parseTabelleZeile, parseSpielplanZeile, deToIso } from './Liga'
 
 function getSaisonListe() {
   const heute = new Date()
@@ -130,11 +130,7 @@ export default function Startseite({ nav }) {
       const plätze = await Promise.all(LIGEN.map(async (l, idx) => {
         const [tabData, spielData] = await Promise.all([
           callSportwinner('GetTabelle', { id_liga: l.id_liga, nr_spieltag: 100, sort: 0 }),
-          callSportwinner('GetSpiel', {
-            id_liga: l.id_liga, id_klub: 0, id_bezirk: 5,
-            id_kreis: 35, id_spieltag: 0, art_bezirk: 2,
-            art_kreis: 1, art_liga: 0, art_spieltag: 0
-          }),
+          callSportwinner('GetSpielplan', { id_liga: l.id_liga }),
         ])
 
         // Tabelle als Map für Platz-Lookup (normalisiert)
@@ -162,7 +158,7 @@ export default function Startseite({ nav }) {
         if (Array.isArray(spielData)) {
           const heute2 = new Date().toISOString().slice(0, 10)
           const tsvSpiele = spielData
-            .map(parseSpieleZeile)
+            .map(parseSpielplanZeile)
             .filter(s => {
               const istOffen = s.status === 'offen' || s.status === '0' || s.status === '' || !s.status
               return istOffen && (istTSV(s.heim) || istTSV(s.gast)) && s.datum >= heute2
