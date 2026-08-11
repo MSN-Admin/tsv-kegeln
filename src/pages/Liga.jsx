@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react'
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sportwinner`
 
 export const LIGEN = [
-  { label: 'G1 – Kreisliga 1', id_liga: 4095 },
-  { label: 'G2 – Kreisliga 2', id_liga: 4098 },
-  { label: 'G3 – Kreisliga 3', id_liga: 4099 },
+  { label: 'G1 – Kreisliga 1', id_liga: 4557 },
+  { label: 'G2 – Kreisliga 2', id_liga: 4558 },
+  { label: 'G3 – Kreisliga 3', id_liga: 4563 },
 ]
 
 const TSV_NAMEN = ['TSV Upf', 'Germering']
@@ -16,7 +16,7 @@ export function istTSV(name) {
 }
 
 export async function callSportwinner(command, params = {}) {
-  const body = { command, id_saison: '11', ...Object.fromEntries(Object.entries(params).map(([k,v]) => [k, String(v)])) }
+  const body = { command, id_saison: '12', ...Object.fromEntries(Object.entries(params).map(([k,v]) => [k, String(v)])) }
   const res = await fetch(FUNCTION_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
