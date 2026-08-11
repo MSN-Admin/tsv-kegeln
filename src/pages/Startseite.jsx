@@ -269,6 +269,7 @@ export default function Startseite({ nav }) {
                 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grau-text)', marginBottom: 6 }}>
                     {liga.label.split('–')[0].trim()}
+                    {liga.kurz && <span style={{ fontWeight: 400, marginLeft: 4 }}>· {liga.kurz}</span>}
                   </div>
                   {l.platz ? (
                     <>
@@ -276,7 +277,7 @@ export default function Startseite({ nav }) {
                         {l.platz}. Platz
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--grau-text)', marginTop: 2 }}>
-                        von {l.von} Mannschaften
+                        von {l.von}
                       </div>
                     </>
                   ) : (
@@ -303,6 +304,7 @@ export default function Startseite({ nav }) {
               }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blau)', marginBottom: 6 }}>
                   {liga.label.split('–')[0].trim()}
+                  {liga.kurz && <span style={{ fontWeight: 400, marginLeft: 3 }}>· {liga.kurz}</span>}
                 </div>
                 {spiel ? (
                   <>
