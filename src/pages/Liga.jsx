@@ -55,7 +55,43 @@ function kuerzeSpieltag(s) {
   return match ? match[1] : s
 }
 
-// Spiele: [id, datum, uhrzeit, heim, heim_mp, gast_mp, gast, sp_heim, sp_gast, status, notiz, spieltag]
+// GetSpielplan-Struktur:
+// [spieltag_label, id, nr, "Wo. TT.MM.JJJJ - HH:MM", heim, gast, ergebnis, mp_heim, mp_gast]
+export function parseSpielplanZeile(s) {
+  // Datum + Uhrzeit aus "Do. 17.09.2026 - 19:00" extrahieren
+  const dtRaw = s[3] || ''
+  const dtMatch = dtRaw.match(/(\d{2})\.(\d{2})\.(\d{4})\s*-\s*(\d{2}:\d{2})/)
+  let datum = '', uhrzeit = ''
+  if (dtMatch) {
+    datum = `${dtMatch[3]}-${dtMatch[2]}-${dtMatch[1]}`
+    uhrzeit = dtMatch[4]
+  }
+  // Ergebnis "-- : --" = noch nicht gespielt, sonst "6 : 2"
+  const erg = (s[6] || '').trim()
+  const gespielt = erg && !erg.includes('--')
+  let heimMp = '', gastMp = ''
+  if (gespielt) {
+    const teile = erg.split(':').map(x => x.trim())
+    heimMp = teile[0] || ''
+    gastMp = teile[1] || ''
+  }
+  return {
+    id:       s[1],
+    spieltag: kuerzeSpieltag(s[0]),
+    datum,
+    uhrzeit,
+    heim:     s[4],
+    gast:     s[5],
+    heimMp,
+    gastMp,
+    spHeim:   s[7] || '',
+    spGast:   s[8] || '',
+    status:   gespielt ? 'gespielt' : 'offen',
+    notiz:    '',
+  }
+}
+
+// ALT – GetSpiel: [id, datum, uhrzeit, heim, heim_mp, gast_mp, gast, sp_heim, sp_gast, status, notiz, spieltag]
 export function parseSpieleZeile(s) {
   return {
     id:       s[0],
@@ -93,11 +129,7 @@ export default function Liga() {
     try {
       const [tabData, spielData] = await Promise.all([
         callSportwinner('GetTabelle', { id_liga: liga.id_liga, nr_spieltag: 100, sort: 0 }),
-        callSportwinner('GetSpiel', {
-          id_liga: liga.id_liga, id_klub: 0, id_bezirk: 5,
-          id_kreis: 35, id_spieltag: 0, art_bezirk: 2,
-          art_kreis: 1, art_liga: 0, art_spieltag: 0
-        }),
+        callSportwinner('GetSpielplan', { id_liga: liga.id_liga }),
       ])
       setTabelle(Array.isArray(tabData) ? tabData : [])
       setSpiele(Array.isArray(spielData) ? spielData : [])
@@ -116,7 +148,7 @@ export default function Liga() {
   }
 
   // Alle Spiele – nur TSV-Spiele, nach Datum sortiert
-  const spieleGesamt = spiele.map(parseSpieleZeile).filter(s => istTSV(s.heim) || istTSV(s.gast))
+  const spieleGesamt = spiele.map(parseSpielplanZeile).filter(s => istTSV(s.heim) || istTSV(s.gast))
   const gespielt      = spieleGesamt.filter(s => !istOffen(s)).sort((a,b) => new Date(b.datum) - new Date(a.datum))
   const ausstehend    = spieleGesamt.filter(s =>  istOffen(s)).sort((a,b) => new Date(a.datum) - new Date(b.datum))
 
