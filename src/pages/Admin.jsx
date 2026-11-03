@@ -188,6 +188,16 @@ export default function Admin() {
     alert('PIN geändert.')
   }
 
+  async function mitgliedLoeschen(m) {
+    if (!confirm(`Mitglied "${m.name}" wirklich endgültig löschen?\n\nAchtung: Alle Ergebnisse dieses Mitglieds bleiben erhalten, aber das Mitglied verschwindet aus allen Listen. Dies kann nicht rückgängig gemacht werden.`)) return
+    const { error } = await supabase.from('mitglieder').delete().eq('id', m.id)
+    if (error) {
+      alert('Löschen nicht möglich: ' + error.message + '\n\nTipp: Wenn das Mitglied noch Ergebnisse oder Pokal-Paarungen hat, stattdessen deaktivieren.')
+      return
+    }
+    ladeAlles()
+  }
+
   // Termine
   async function terminAnlegen() {
     setTMeldung('')
@@ -631,7 +641,8 @@ export default function Admin() {
                       </td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <button onClick={() => pinAendern(m)} style={{ background: 'none', border: 'none', color: '#003D8F', cursor: 'pointer', fontSize: 13, marginRight: 10 }}>PIN</button>
-                        <button onClick={() => toggleAktiv(m)} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 13 }}>{m.aktiv ? 'deakt.' : 'aktiv.'}</button>
+                        <button onClick={() => toggleAktiv(m)} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 13, marginRight: 10 }}>{m.aktiv ? 'deakt.' : 'aktiv.'}</button>
+                        <button onClick={() => mitgliedLoeschen(m)} title="Mitglied endgültig löschen" style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 15 }}>🗑️</button>
                       </td>
                     </tr>
                   ))}
